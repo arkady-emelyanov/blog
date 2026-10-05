@@ -1,3 +1,7 @@
+---
+description: "What to monitor on a GPU cluster, layer by layer, and how to read the graphs, from GPUs to BMCs."
+---
+
 # AI lab, part 6: observing a GPU cluster, layer by layer
 
 *Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · **Observability** · [Networking](07-networking.md)*

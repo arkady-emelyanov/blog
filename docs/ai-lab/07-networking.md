@@ -1,3 +1,7 @@
+---
+description: "The networks of a GPU cluster, what the lab emulates for each, and where the emulation stops."
+---
+
 # AI lab, part 7: networking, and where the emulation stops
 
 *Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · **Networking***

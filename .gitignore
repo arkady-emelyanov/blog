@@ -1,2 +1,5 @@
 .omc/
 PLAN.md
+.venv/
+site/
+.cache/

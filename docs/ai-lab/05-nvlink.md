@@ -1,3 +1,7 @@
+---
+description: "NVLink partitions, fabric health and telemetry, and how a partition change reaches the scheduler."
+---
+
 # AI lab, part 5: NVLink partitions, fabric health and telemetry
 
 *Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · **NVLink** · [Observability](06-observability.md) · [Networking](07-networking.md)*

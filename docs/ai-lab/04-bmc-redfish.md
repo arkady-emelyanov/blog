@@ -1,3 +1,7 @@
+---
+description: "Out-of-band management of GPU trays with Redfish BMCs: inventory, GPU sensors, NVLink faults and power cycles."
+---
+
 # AI lab, part 4: BMCs and Redfish, the out-of-band side of a GPU rack
 
 *Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · **BMC and Redfish** · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*

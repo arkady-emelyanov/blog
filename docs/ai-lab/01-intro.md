@@ -1,3 +1,7 @@
+---
+description: "A GB200-class GPU cluster emulated on one Linux machine: what it is, what you can practise with it, and how to set it up."
+---
+
 # AI lab, part 1: a GB200 GPU cluster on your laptop (minus the GPUs)
 
 *Series: **Intro** · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*

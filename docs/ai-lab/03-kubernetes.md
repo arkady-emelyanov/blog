@@ -1,3 +1,7 @@
+---
+description: "The same emulated GPU cluster on Kubernetes: GPU pods, Kueue topology-aware queueing, JobSet and monitoring."
+---
+
 # AI lab, part 3: the same GPU cluster on Kubernetes, with Kueue and JobSet
 
 *Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · **Kubernetes** · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*

@@ -1,3 +1,7 @@
+---
+description: "Running the emulated GB200 cluster with Slurm: GPU scheduling, jobs from srun to PyTorch DDP, drains, quotas and monitoring."
+---
+
 # AI lab, part 2: running an emulated GB200 cluster with Slurm
 
 *Series: [Intro](01-intro.md) · **Slurm** · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*

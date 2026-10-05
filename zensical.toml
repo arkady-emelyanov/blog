@@ -1,0 +1,71 @@
+[project]
+site_name = "Blog"
+# Absolute URL of the published site: social cards and og:image need it.
+site_url = "https://www.example.com/"
+docs_dir = "docs"
+site_dir = "site"
+nav = [
+  { "Home" = "index.md" },
+  { "AI lab" = [
+    "ai-lab/index.md",
+    "ai-lab/01-intro.md",
+    "ai-lab/02-slurm.md",
+    "ai-lab/03-kubernetes.md",
+    "ai-lab/04-bmc-redfish.md",
+    "ai-lab/05-nvlink.md",
+    "ai-lab/06-observability.md",
+    "ai-lab/07-networking.md",
+  ] },
+]
+
+[project.theme]
+language = "en"
+features = [
+  "content.code.copy",
+  "content.code.select",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.path",
+  "navigation.sections",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+  "toc.follow",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "indigo"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "indigo"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+# Social cards: one 1200x630 image per page plus Open Graph tags (LinkedIn previews).
+[project.plugins.social]
+enabled = true
+cards = true
+
+[project.markdown_extensions]
+admonition = {}
+attr_list = {}
+md_in_html = {}
+tables = {}
+toc.permalink = true
+pymdownx.highlight.anchor_linenums = true
+pymdownx.highlight.line_spans = "__span"
+pymdownx.highlight.pygments_lang_class = true
+pymdownx.inlinehilite = {}
+pymdownx.superfences = {}
