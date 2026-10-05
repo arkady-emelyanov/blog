@@ -1,4 +1,5 @@
 ---
+image: "ai-lab/images/social/03-kubernetes.png"
 description: "The same emulated GPU cluster on Kubernetes: GPU pods, Kueue topology-aware queueing, JobSet and monitoring."
 ---
 

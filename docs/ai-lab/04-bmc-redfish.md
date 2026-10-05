@@ -1,4 +1,5 @@
 ---
+image: "ai-lab/images/social/04-bmc-redfish.png"
 description: "Out-of-band management of GPU trays with Redfish BMCs: inventory, GPU sensors, NVLink faults and power cycles."
 ---
 

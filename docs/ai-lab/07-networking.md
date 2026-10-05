@@ -1,4 +1,5 @@
 ---
+image: "ai-lab/images/social/07-networking.png"
 description: "The networks of a GPU cluster, what the lab emulates for each, and where the emulation stops."
 ---
 

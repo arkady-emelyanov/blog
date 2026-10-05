@@ -1,4 +1,5 @@
 ---
+image: "ai-lab/images/social/06-observability.png"
 description: "What to monitor on a GPU cluster, layer by layer, and how to read the graphs, from GPUs to BMCs."
 ---
 

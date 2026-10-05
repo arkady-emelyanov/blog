@@ -1,4 +1,5 @@
 ---
+image: "ai-lab/images/social/05-nvlink.png"
 description: "NVLink partitions, fabric health and telemetry, and how a partition change reaches the scheduler."
 ---
 

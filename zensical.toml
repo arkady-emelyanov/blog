@@ -1,11 +1,11 @@
 [project]
 site_name = "Blog"
-# Absolute URL of the published site: social cards and og:image need it.
+# Absolute URL of the published site: og:image needs it (LinkedIn wants absolute HTTPS).
 site_url = "https://www.example.com/"
 docs_dir = "docs"
 site_dir = "site"
 nav = [
-  { "Home" = "index.md" },
+  "index.md",
   { "AI lab" = [
     "ai-lab/index.md",
     "ai-lab/01-intro.md",
@@ -20,6 +20,8 @@ nav = [
 
 [project.theme]
 language = "en"
+# overrides/main.html: Open Graph tags from each page's front-matter `image`.
+custom_dir = "overrides"
 features = [
   "content.code.copy",
   "content.code.select",
@@ -52,11 +54,6 @@ scheme = "slate"
 primary = "indigo"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
-
-# Social cards: one 1200x630 image per page plus Open Graph tags (LinkedIn previews).
-[project.plugins.social]
-enabled = true
-cards = true
 
 [project.markdown_extensions]
 admonition = {}

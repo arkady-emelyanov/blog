@@ -1,4 +1,5 @@
 ---
+image: "ai-lab/images/social/02-slurm.png"
 description: "Running the emulated GB200 cluster with Slurm: GPU scheduling, jobs from srun to PyTorch DDP, drains, quotas and monitoring."
 ---
 

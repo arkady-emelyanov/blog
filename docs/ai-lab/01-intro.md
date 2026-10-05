@@ -1,4 +1,5 @@
 ---
+image: "ai-lab/images/social/01-intro.png"
 description: "A GB200-class GPU cluster emulated on one Linux machine: what it is, what you can practise with it, and how to set it up."
 ---
 

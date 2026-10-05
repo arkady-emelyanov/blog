@@ -1,3 +1,8 @@
+---
+image: "ai-lab/images/social/index.png"
+description: "Hands-on AI infrastructure without the hardware: the AI lab series."
+---
+
 # Blog
 
 ## Series
