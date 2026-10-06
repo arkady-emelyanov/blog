@@ -38,9 +38,10 @@ GFD adds about 25 more `nvidia.com/*` labels per tray, all derived from the fake
 Queues:
 
 ```console
-$ kubectl get clusterqueues; kubectl get localqueues
+$ kubectl get clusterqueues
 NAME   COHORT   PENDING WORKLOADS
 gpu             0
+$ kubectl get localqueues
 NAME      CLUSTERQUEUE   PENDING WORKLOADS   ADMITTED WORKLOADS
 default   gpu            0                   0
 gpu       gpu            0                   0
