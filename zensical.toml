@@ -1,5 +1,5 @@
 [project]
-site_name = "Blog"
+site_name = "The Control Plane"
 # Absolute URL of the published site: og:image needs it (LinkedIn wants absolute HTTPS).
 site_url = "https://www.example.com/"
 docs_dir = "docs"
