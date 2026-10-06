@@ -24,16 +24,7 @@ The lab emulates one NVIDIA GB200-class **NVL8** NVLink domain:
 
 Around that hardware it runs the software stack of a production GPU cluster: **Slurm** with accounting *or* **Kubernetes** (k3s) with Kueue, OpenLDAP users, a shared filesystem (JuiceFS on RustFS), per-user S3 buckets, node-local scratch, and Prometheus with Grafana. Each piece is an Incus system container, and Ansible configures all of it behind a `Makefile`.
 
-```
- your machine: bin/ssh · bin/kubectl · bin/redfish · bin/grpcurl · browser
-        │
- ═══════╧══════════ Incus bridge (management network) ═══════════════════════
-   sched-login     sched-control        sched-storage   sched-worker1/2    sched-nvswitch
-   user shells     slurmctld or k3s,    S3, JuiceFS     GPU trays,         NVLink partition
-                   LDAP, Prometheus,    metadata        4 × GB200 each     controller,
-                   Grafana, topograph                                      fabric telemetry
-   BMCs: sched-worker1-bmc, sched-worker2-bmc, sched-nvswitch-bmc
-```
+![The lab: your machine and every instance on one Incus bridge; five instances (login, control, storage, two GPU trays, NVLink switch tray) and three BMCs](architecture.png)
 
 ## The emulation boundary
 
