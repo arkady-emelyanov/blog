@@ -4,6 +4,8 @@ site_name = "Blog"
 site_url = "https://www.example.com/"
 docs_dir = "docs"
 site_dir = "site"
+# Site icons before external links (GitHub, NVIDIA docs, linuxcontainers.org).
+extra_css = ["assets/stylesheets/links.css"]
 nav = [
   "index.md",
   { "AI lab" = [
@@ -29,8 +31,6 @@ features = [
   "navigation.indexes",
   "navigation.instant",
   "navigation.path",
-  "navigation.sections",
-  "navigation.tabs",
   "navigation.top",
   "navigation.tracking",
   "search.highlight",

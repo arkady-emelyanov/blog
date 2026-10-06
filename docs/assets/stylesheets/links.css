@@ -1,0 +1,28 @@
+/* Site icon before external links, by domain. The GitHub mark is a mask in
+   the text colour so it follows light and dark mode; the others are the
+   sites' own favicons. */
+.md-typeset a[href^="https://github.com/"]::before,
+.md-typeset a[href^="https://linuxcontainers.org/"]::before,
+.md-typeset a[href^="https://docs.nvidia.com/"]::before {
+  content: "";
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.25em;
+  vertical-align: -0.125em;
+  background: no-repeat center / contain;
+}
+
+.md-typeset a[href^="https://github.com/"]::before {
+  background-color: currentColor;
+  -webkit-mask: url("../icons/github.svg") no-repeat center / contain;
+  mask: url("../icons/github.svg") no-repeat center / contain;
+}
+
+.md-typeset a[href^="https://linuxcontainers.org/"]::before {
+  background-image: url("../icons/linuxcontainers.png");
+}
+
+.md-typeset a[href^="https://docs.nvidia.com/"]::before {
+  background-image: url("../icons/nvidia.png");
+}
