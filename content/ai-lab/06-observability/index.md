@@ -5,6 +5,8 @@ description = "What to monitor on a GPU cluster, layer by layer, and how to read
 
 [extra]
 social_media_card = "card.png"
+# Thumbnail in the post list.
+local_image = "ai-lab/06-observability/card.png"
 +++
 
 The earlier parts each peeked at a metric or two. This one is about monitoring as a whole: which layers of a GPU cluster need watching, what each layer's signals mean, and how to read the lab's Grafana dashboards. The screenshots come from one scripted 10-minute run on the lab in Kubernetes mode. The dashboards are identical in Slurm mode.
