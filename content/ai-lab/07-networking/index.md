@@ -26,7 +26,7 @@ On a real rack these are separate wires. GB200 compute trays carry ConnectX adap
 
 Every container has one interface on `incusbr0`. Here's a tray in Kubernetes mode:
 
-```
+```console
 $ bin/ssh sched-worker1 ip -br addr
 lo               UNKNOWN        127.0.0.1/8 ::1/128
 flannel.1        UNKNOWN        10.42.2.0/32 fe80::dc1c:1fff:fe03:ee5/64
@@ -50,7 +50,7 @@ That's correct for this topology, not just an emulation shortcut. Both trays are
 
 What the lab does emulate is the part of InfiniBand that cluster software reads: the switch topology. Each tray has a fake `ibnetdiscover` that prints an NDR fabric with one spine, one leaf and four HCAs per tray, described in `/etc/fakeib.json`:
 
-```
+```console
 $ bin/ssh sched-worker1 sudo ibnetdiscover
 …
 Switch	65 "S-2c5eab0306555424"		# "MF0;LAB-IBSPINE-01:MQM9701/U1" enhanced port 0 lid 1 lmc 0
@@ -67,7 +67,7 @@ Switch	65 "S-2c5eab036832a42e"		# "MF0;LAB-IBLEAF-01:MQM9701/U1" enhanced port 0
 
 Two switches, eight HCAs (`mlx5_0`–`mlx5_3` on each tray, one per GPU, 4×NDR = 400 Gb/s each), and four leaf-to-spine uplinks. The format is the real one, so the real consumer can parse it. That consumer is NVIDIA's [topograph](https://github.com/dsx-ai-factory/topograph): every minute it runs `ibnetdiscover` on the trays, combines the switch tree with the NVLink cliques from NVML, and hands the result to the scheduler. In Kubernetes mode it becomes node labels, one per tier:
 
-```
+```console
 $ bin/kubectl get nodes -l nvidia.com/gpu.present=true \
     -L accelerator.topograph.run/domain,fabric.topograph.run/tier-0,fabric.topograph.run/tier-1
 NAME            STATUS   ROLES    AGE    VERSION        DOMAIN                                   TIER-0               TIER-1
@@ -81,7 +81,7 @@ Kueue's `nvl` topology orders these as spine → leaf → NVLink domain → node
 
 The fabric exists only as `ibnetdiscover`'s output. The trays have no `/sys/class/infiniband`, no `ibstat`, no `perfquery`, and no RDMA devices:
 
-```
+```console
 $ bin/ssh sched-worker1 ls /sys/class/infiniband
 ls: cannot access '/sys/class/infiniband': No such file or directory
 ```

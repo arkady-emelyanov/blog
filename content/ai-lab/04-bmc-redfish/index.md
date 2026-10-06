@@ -30,14 +30,14 @@ The credentials are OpenBMC's defaults, `root` / `0penBmc`, and the certificates
 
 The service root is the one resource you can read without logging in:
 
-```
+```console
 $ curl -sk https://10.107.111.31/redfish/v1 | jq -c '{RedfishVersion, Systems, Chassis, Managers}'
 {"RedfishVersion":"1.17.0","Systems":{"@odata.id":"/redfish/v1/Systems"},"Chassis":{"@odata.id":"/redfish/v1/Chassis"},"Managers":{"@odata.id":"/redfish/v1/Managers"}}
 ```
 
 The usual three branches are there. *Systems* is what runs (host, CPUs, GPUs). *Chassis* is the physical enclosure. *Managers* is the BMC itself.
 
-```
+```console
 $ bin/redfish sched-worker1 /redfish/v1/Systems/System_0 | jq '{PowerState, Status, ProcessorSummary}'
 {
   "PowerState": "On",
@@ -50,7 +50,7 @@ $ bin/redfish sched-worker1 /redfish/v1/Chassis/Chassis_0 | jq -c '{ChassisType,
 
 In the lab, the GPUs are processors of `System_0`. The BMC's UUID matches the one `nvidia-smi` reports inside the tray, so inventory tooling can join out-of-band and in-band data on it:
 
-```
+```console
 $ bin/redfish sched-worker1 /redfish/v1/Systems/System_0/Processors/GPU_0 | jq '{Model, UUID, SerialNumber, Oem}'
 {
   "Model": "NVIDIA GB200",
@@ -85,7 +85,7 @@ GPU 0: NVIDIA GB200 (UUID: GPU-81501924-f170-f6d0-f2da-dc7595876881)
 
 Each GPU has 18 NVLink ports, and each port has a pending-settings object (`@Redfish.Settings`). That's the standard Redfish pattern for changes that only take effect at the next reset:
 
-```
+```console
 $ bin/redfish sched-worker1 /redfish/v1/Systems/System_0/Processors/GPU_2/Ports/NVLink_3 \
     | jq -c '{LinkState, LinkStatus, CurrentSpeedGbps, Settings: ."@Redfish.Settings".SettingsObject}'
 {"LinkState":"Enabled","LinkStatus":"LinkUp","CurrentSpeedGbps":200,"Settings":{"@odata.id":"/redfish/v1/Systems/System_0/Processors/GPU_2/Ports/NVLink_3/Settings"}}
@@ -93,7 +93,7 @@ $ bin/redfish sched-worker1 /redfish/v1/Systems/System_0/Processors/GPU_2/Ports/
 
 The switch tray BMC describes the other end of the cable. Every switch port knows which tray, GPU and link it's connected to:
 
-```
+```console
 $ bin/redfish sched-nvswitch /redfish/v1/Fabrics/NVLinkFabric_0/Switches/NVSwitch_0/Ports/NVLink_19 \
     | jq -c '{LinkStatus, RemoteEndpoint: .Oem.Nvidia.RemoteEndpoint}'
 {"LinkStatus":"LinkUp","RemoteEndpoint":{"BMC":"sched-worker1-bmc","GPU":"GPU_2","GPUUUID":"81502f39-9cad-de97-2723-3d7d71928458","Host":"sched-worker1","Port":"NVLink_2"}}
@@ -101,7 +101,7 @@ $ bin/redfish sched-nvswitch /redfish/v1/Fabrics/NVLinkFabric_0/Switches/NVSwitc
 
 The tray BMCs also carry **GPU sensors**, which is how a BMC reports temperature and power when the host OS can't. On a real tray the BMC reads them from the GPUs over its own sideband bus. In the lab the BMC reads the same GPU state NVML does and applies the same model, so the two agree. Captured during a training run:
 
-```
+```console
 $ bin/redfish sched-worker1 /redfish/v1/Chassis/Chassis_0/Sensors | jq -r '.Members[]."@odata.id"'
 /redfish/v1/Chassis/Chassis_0/Sensors/GPU_0_TEMP_0
 /redfish/v1/Chassis/Chassis_0/Sensors/GPU_0_Power_0
@@ -124,7 +124,7 @@ The temperature matches exactly. The power readings differ by about 20 W because
 
 Stage two links of GPU 2 as disabled. The live port is unchanged until the reset:
 
-```
+```console
 $ for l in 3 4; do
     bin/redfish sched-worker1 /redfish/v1/Systems/System_0/Processors/GPU_2/Ports/NVLink_$l/Settings \
       -X PATCH -d '{"LinkState": "Disabled"}'
@@ -138,7 +138,7 @@ $ bin/redfish sched-worker1 /redfish/v1/Systems/System_0/Actions/ComputerSystem.
 
 About 20 seconds later the tray is back up, and both the BMC and the GPU's own view agree:
 
-```
+```console
 $ bin/redfish sched-worker1 …/GPU_2/Ports/NVLink_3 | jq -c '{LinkState, LinkStatus, Status}'
 {"LinkState":"Disabled","LinkStatus":"LinkDown","Status":{"Health":"Warning","State":"Disabled"}}
 
@@ -157,7 +157,7 @@ Slurm didn't notice anything. The tray restarted well within `SlurmdTimeout` (30
 
 Switch-side changes apply immediately, with no reset. Port 19 on `NVSwitch_0` is GPU 2's link 2:
 
-```
+```console
 $ bin/redfish sched-nvswitch /redfish/v1/Fabrics/NVLinkFabric_0/Switches/NVSwitch_0/Ports/NVLink_19 \
     -X PATCH -d '{"LinkState": "Disabled"}'
 $ bin/ssh sched-worker1 'nvidia-smi topo -m | grep ^GPU2; nvidia-smi nvlink -s -i 2 | grep "Link 2:"'
@@ -176,7 +176,7 @@ For link state from the switch side, trust the switch BMC or NVML in the lab, no
 
 ### Power off without draining (what not to do)
 
-```
+```console
 $ bin/redfish sched-worker2 /redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset \
     -X POST -d '{"ResetType": "ForceOff"}'
 $ bin/redfish sched-worker2 /redfish/v1/Systems/System_0 | jq -c '{PowerState}'
@@ -189,7 +189,7 @@ sched-worker2 idle
 
 The tray is off, but Slurm still sees it as `idle`. Prometheus is quicker: `up{job="gpu", instance="sched-worker2:9835"}` drops to `0` within seconds. A two-tray job submitted now gets placed on the dead node and fails:
 
-```
+```console
 $ sbatch -J blind -N2 --gpus-per-node=4 --wrap "srun hostname"
 Submitted batch job 20
 $ sacct -X -n -j 20 -o JobID,JobName,State

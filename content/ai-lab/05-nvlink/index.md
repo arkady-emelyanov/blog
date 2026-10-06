@@ -25,7 +25,7 @@ In the lab, the domain is 8 GPUs, the switch tray has two NVSwitch chips with 72
 
 From the tray, NVML shows the fabric registration of every GPU:
 
-```
+```console
 $ bin/ssh sched-worker1 nvidia-smi --query-gpu=index,fabric.clusterUuid,fabric.cliqueId --format=csv
 index, fabric.cluster_uuid, fabric.clique_id
 0, 7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91, 1
@@ -34,7 +34,7 @@ index, fabric.cluster_uuid, fabric.clique_id
 
 From the switch side, use `bin/grpcurl` (built on first use). Every client starts with `Hello`:
 
-```
+```console
 $ nmx() { bin/grpcurl -plaintext -d "$2" 10.107.111.34:9370 nmxlab.v1.NMXController/$1; }
 $ nmx Hello '{"gateway_id": "me"}'
 { "majorVersion": 1, "domainUuid": "7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91" }
@@ -54,7 +54,7 @@ $ nmx GetDomainProperties '{"gateway_id": "me"}'
 
 Out of the box, all 8 GPUs are in the **default partition**, ID 32766:
 
-```
+```console
 $ nmx GetPartitionInfoList '{"gateway_id": "me"}' | jq -c '.partitions[] | {partitionId, partitionName, gpus: (.gpuUids|length), state}'
 {"partitionId":32766,"partitionName":"default","gpus":8,"state":"ACTIVE"}
 ```
@@ -65,7 +65,7 @@ $ nmx GetPartitionInfoList '{"gateway_id": "me"}' | jq -c '.partitions[] | {part
 
 Remember the two NVLinks disabled through the tray BMC in Part 4? While they were down, the lab's controller rated that GPU as degraded (output trimmed to GPU 2):
 
-```
+```console
 $ nmx GetGpuInfoList '{"gateway_id": "me", "slot_ids": [1]}'
 { "uuid": "GPU-81502f39-…", "hostname": "sched-worker1", "location": {"slotId": 1, "gpuId": 2},
   "partitionId": 32766, "cliqueId": 1, "activeNvlinks": 16, "health": "NMX_GPU_HEALTH_DEGRADED_BANDWIDTH" }
@@ -79,7 +79,7 @@ The same appears in metrics as `nvlink_gpu_active_links{host="sched-worker1",gpu
 
 Give tray 2 its own partition. A GPU belongs to at most one partition, so you take it out of the default partition first:
 
-```
+```console
 $ gpus='[{"slot_id":2,"gpu_id":0},{"slot_id":2,"gpu_id":1},{"slot_id":2,"gpu_id":2},{"slot_id":2,"gpu_id":3}]'
 $ nmx RemoveGpusFromPartition "{\"gateway_id\": \"me\", \"partition_id\": 32766, \"locations\": $gpus}"
 $ bin/ssh sched-worker2 nvidia-smi --query-gpu=index,fabric.cliqueId --format=csv
@@ -90,7 +90,7 @@ index, fabric.clique_id
 
 Clique `0` means the GPU is in no partition. On real hardware that GPU now has no NVLink peers at all. Create the new partition:
 
-```
+```console
 $ nmx CreatePartition "{\"gateway_id\": \"me\", \"partition_name\": \"tray2\", \"partition_id\": 7, \"locations\": $gpus}"
 { "message": "partition created", "partition": { "partitionId": 7, "partitionName": "tray2", … "state": "ACTIVE" } }
 $ bin/ssh sched-worker2 nvidia-smi --query-gpu=index,fabric.cliqueId --format=csv
@@ -113,7 +113,7 @@ Nobody tells Slurm about this directly. Every minute, topograph on the controlle
           BlockName=block002 BlockIndex=1 Nodes=sched-worker2
 ```
 
-```
+```console
 $ bin/ssh sched-control cat /etc/slurm/topology.conf
 # block001=7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91.1
 BlockName=block001 Nodes=sched-worker1
@@ -127,7 +127,7 @@ Each block is named after the cluster UUID and clique it was built from. In Kube
 
 You might expect `nvl8-hello` (2 nodes × 4 GPUs) to wait now. It doesn't:
 
-```
+```console
 $ sbatch --wait nvl8-hello.sbatch && cat nvl8-hello-21.out
 job 21 on sched-worker[1-2]: 8 tasks
 0: rank 0 on sched-worker1 CUDA_VISIBLE_DEVICES=0: NVIDIA GB200, GPU-81501924-…, 1, scratch  198G
@@ -146,7 +146,7 @@ Merge back with `DeletePartition` (its GPUs land in no partition) followed by `A
 
 The controller reads per-GPU NVLink byte counters that the fake CUDA stack keeps for NCCL collectives and GPU-to-GPU copies, and exposes them alongside the link and partition state:
 
-```
+```console
 $ curl -s http://10.107.111.34:9372/metrics | grep -E '^(nvlink_domain_info|nvlink_partition_gpus|nvswitch_ports_up)'
 nvlink_domain_info{cluster_uuid="7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91",domain="nvl8"} 1
 nvlink_partition_gpus{default="true",name="default",partition_id="32766"} 8

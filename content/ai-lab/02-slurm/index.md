@@ -15,7 +15,7 @@ Commands prefixed with `$` run on the login node as the directory user `joe` (`b
 
 ## Runtime information
 
-```
+```console
 $ sinfo
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
 gpu*         up   infinite      2   idle sched-worker[1-2]
@@ -28,7 +28,7 @@ sched-worker2 gpu:gb200:4 4 7500 51200 idle
 
 There is one partition with two nodes. Each node has four GPUs of type `gb200`, 4 cores, 7.5 GB of schedulable memory and 50 GB of node-local scratch. `scontrol show node` gives the full picture, including what's allocated right now:
 
-```
+```console
 $ scontrol show node sched-worker1
 NodeName=sched-worker1 Arch=x86_64 CoresPerSocket=4
    …
@@ -42,7 +42,7 @@ NodeName=sched-worker1 Arch=x86_64 CoresPerSocket=4
 
 Accounting is enforced, so a user without an association can't submit anything. `joe` belongs to the account `lab`:
 
-```
+```console
 $ sacctmgr -n show assoc user=joe format=cluster,account,user,qos
       nvl8        lab        joe               normal
 ```
@@ -75,7 +75,7 @@ NodeName=sched-worker1,sched-worker2 … RealMemory=7500 TmpDisk=51200 Gres=gpu:
 
 - **`topology/block`** is the setting that matters for NVL-class systems. A block is a set of nodes that share an NVLink partition, and Slurm keeps jobs that fit in one block inside it. Nobody writes `topology.conf` by hand here. NVIDIA's [topograph](https://github.com/dsx-ai-factory/topograph) generates it every minute from the live fabric (more on that in [Part 5](@/ai-lab/05-nvlink/index.md)):
 
-  ```
+  ```console
   $ scontrol show topology
   BlockName=block001 BlockIndex=0 Nodes=sched-worker[1-2]
   ```
@@ -87,7 +87,7 @@ NodeName=sched-worker1,sched-worker2 … RealMemory=7500 TmpDisk=51200 Gres=gpu:
 
 **Binding.** Ask for 8 tasks with one GPU each and check what every task receives:
 
-```
+```console
 $ srun -N2 --ntasks-per-node=4 --gpus-per-task=1 bash -c 'echo $(hostname) $CUDA_VISIBLE_DEVICES' | sort
 sched-worker1 0
 sched-worker1 1
@@ -101,7 +101,7 @@ sched-worker2 3
 
 **What CUDA sees.** A job that asks for two GPUs sees two GPUs:
 
-```
+```console
 $ srun -N1 --gpus-per-node=2 bash -c 'echo CVD=$CUDA_VISIBLE_DEVICES;
     /shared/venv/bin/python -c "import torch; print(torch.cuda.device_count())"'
 CVD=0,1
@@ -112,7 +112,7 @@ CVD=0,1
 
 **A batch job across the domain.** The examples from the repository (`bin/scp -r examples login:`) include `nvl8-hello.sbatch`, which runs eight tasks with one GPU each. Every task reports its GPU's UUID and NVLink clique:
 
-```
+```console
 $ cd examples/slurm && sbatch --wait nvl8-hello.sbatch
 Submitted batch job 14
 $ cat nvl8-hello-14.out
@@ -127,7 +127,7 @@ All eight GPUs are in clique `1`, which is the same NVLink partition.
 
 **PyTorch DDP on 8 GPUs.** `ddp-train.sbatch` starts one `torchrun` per tray, with four ranks each, NCCL as the backend and rendezvous on the first node. It needs the frameworks venv (`make frameworks`), and extra arguments go straight to the training script:
 
-```
+```console
 $ sbatch ddp-train.sbatch --steps 60000
 Submitted batch job 2
 $ grep -E "^step +(10|50|60000) |rank 0/" ddp-train-2.out
@@ -143,7 +143,7 @@ The step time comes from the simulated cost of the GEMMs and the all-reduce. Cha
 
 **Accounting.** Every job is recorded with its GPU allocation:
 
-```
+```console
 $ sacct -X -o JobID,JobName,User,Account,AllocTRES%45,Elapsed,State
 2             ddp-train       joe        lab  billing=8,cpu=8,gres/gpu=8,mem=15000M,node=2   00:04:41  COMPLETED
 3            nvl8-hello       joe        lab  billing=8,cpu=8,gres/gpu=8,mem=15000M,node=2   00:00:01  COMPLETED
@@ -151,7 +151,7 @@ $ sacct -X -o JobID,JobName,User,Account,AllocTRES%45,Elapsed,State
 
 **Draining a node for maintenance.** Run these as root on the controller (`bin/ssh sched-control`):
 
-```
+```console
 # scontrol update nodename=sched-worker2 state=drain reason="maintenance: BMC firmware"
 # sinfo -R
 REASON               USER      TIMESTAMP           NODELIST
@@ -160,7 +160,7 @@ maintenance: BMC fir root      2026-10-05T19:31:07 sched-worker2
 
 A job that needs both trays now waits, and Slurm says why:
 
-```
+```console
 $ sbatch -J two-trays -N2 --gpus-per-node=4 --wrap "nvidia-smi -L"
 $ squeue
 JOBID PARTITION     NAME     USER ST  TIME  NODES NODELIST(REASON)
@@ -171,7 +171,7 @@ JOBID PARTITION     NAME     USER ST  TIME  NODES NODELIST(REASON)
 
 **GPU quotas.** Limits live on associations. Cap `joe` at four GPUs:
 
-```
+```console
 # sacctmgr -i modify user joe set GrpTRES=gres/gpu=4
 $ sbatch -J big -N2 --gpus-per-node=4 --wrap "sleep 5"
 $ sbatch -J small -N1 --gpus-per-node=4 --wrap "sleep 5"
@@ -187,7 +187,7 @@ The 8-GPU job waits on `AssocGrpGRES` while the 4-GPU job runs. `GrpTRES=gres/gp
 
 While the 60,000-step DDP job runs, the tray looks busy:
 
-```
+```console
 $ bin/ssh sched-worker1 nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw,temperature.gpu --format=csv
 index, utilization.gpu [%], memory.used [MiB], power.draw [W], temperature.gpu
 0, 79 %, 7850 MiB, 813.26 W, 67

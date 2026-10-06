@@ -15,7 +15,7 @@ To switch, set `scheduler: k3s` in `inventory/group_vars/all.yml`, then run `mak
 
 ## Runtime information
 
-```
+```console
 $ kubectl get nodes -L nvidia.com/gpu.clique,accelerator.topograph.run/domain
 NAME            STATUS   ROLES           AGE     VERSION        GPU.CLIQUE                               DOMAIN
 sched-control   Ready    control-plane   7m39s   v1.36.5+k3s1
@@ -25,7 +25,7 @@ sched-worker2   Ready    <none>          7m24s   v1.36.5+k3s1   7f3c2a10-5b4e-4d
 
 The two trays are worker nodes. The controller runs the control plane and add-ons, and is tainted so pods don't land on it. Both trays carry the same NVLink clique, and two different components publish it. `nvidia.com/gpu.clique` comes from NVIDIA's GPU Feature Discovery (GFD), which reads it from NVML. `accelerator.topograph.run/domain` comes from topograph, which rebuilds it from the live NVLink and InfiniBand fabric every minute.
 
-```
+```console
 $ kubectl get nodes -o custom-columns='NODE:.metadata.name,GPU:.status.allocatable.nvidia\.com/gpu,PRODUCT:.metadata.labels.nvidia\.com/gpu\.product,MEM:.metadata.labels.nvidia\.com/gpu\.memory'
 NODE            GPU      PRODUCT        MEM
 sched-control   <none>   <none>         <none>
@@ -37,7 +37,7 @@ GFD adds about 25 more `nvidia.com/*` labels per tray, all derived from the fake
 
 Queues:
 
-```
+```console
 $ kubectl get clusterqueues; kubectl get localqueues
 NAME   COHORT   PENDING WORKLOADS
 gpu             0
@@ -48,7 +48,7 @@ gpu       gpu            0                   0
 
 `joe` works in the `joe` namespace. They can create pods and JobSets there and read nodes and queues, but they can't touch other namespaces or cluster-wide queue objects:
 
-```
+```console
 $ kubectl auth can-i create jobsets.jobset.x-k8s.io
 yes
 $ kubectl auth can-i create pods -n kube-system
@@ -68,14 +68,14 @@ no
 
 The device plugin is the lab's own. NVIDIA's device plugin and container toolkit expect a real driver installation, so the lab ships a small replacement that hands out GPUs by UUID through CDI:
 
-```
+```console
 $ bin/ssh sched-worker1 'jq -c "{kind, devices: [.devices[].name]}" /etc/cdi/fakegpu.json'
 {"kind":"nvidia.com/gpu","devices":["0","GPU-81501924-f170-f6d0-f2da-dc7595876881","1","GPU-8150a4ae-…", …]}
 ```
 
 Kueue is where the topology awareness lives. Its `Topology` object, `nvl`, orders the node labels from coarse to fine:
 
-```
+```console
 $ bin/kubectl get topology nvl -o jsonpath='{.spec.levels}' | jq -c '[.[].nodeLabel]'
 ["fabric.topograph.run/tier-1","fabric.topograph.run/tier-0","accelerator.topograph.run/domain","kubernetes.io/hostname"]
 ```
@@ -101,7 +101,7 @@ spec:
         limits: {nvidia.com/gpu: 2}
 ```
 
-```
+```console
 $ kubectl apply -f gpu-pod.yaml
 $ kubectl logs gpu-pod
 GPU 0: NVIDIA GB200 (UUID: GPU-8150a4ae-478e-5534-f66c-621a95f85f59)
@@ -110,7 +110,7 @@ GPU 1: NVIDIA GB200 (UUID: GPU-81502f39-9cad-de97-2723-3d7d71928458)
 
 The pod sees exactly two GPUs. They are physical GPUs 1 and 2 of `sched-worker1`, renumbered 0 and 1, just as with the real driver. `nvidia-smi` and CUDA agree on what the pod has, because CDI only injects the allocated device nodes. The pod has no queue label, but Kueue still takes it: it goes to the namespace's `default` LocalQueue and is admitted against the same ClusterQueue quota as everything else, so nobody can grab GPUs by skipping the queue:
 
-```
+```console
 $ kubectl get workloads | grep gpu-pod
 pod-gpu-pod-c7498                  default   gpu           True       True       3s
 ```
@@ -119,7 +119,7 @@ I use `mirror.gcr.io` because it serves the same image as Docker Hub (identical 
 
 **The examples.** The repository's `examples/kubernetes/` has four example jobs, written as JobSets queued in Kueue. `submit` is a small helper: it fills in your uid, gid and home, gives the run a unique name, and with `--wait` collects the logs into `<name>.out`.
 
-```
+```console
 $ cd examples/kubernetes
 $ ./submit --wait nvl8-hello.yaml
 nvl8-hello-000472
@@ -131,7 +131,7 @@ $ cat nvl8-hello-000472.out
 
 That's eight pods, each holding one different GPU, all in clique 1. DDP works the same way: two pods with four GPUs each, and `torchrun` doing rendezvous on pod 0 through the JobSet's DNS name:
 
-```
+```console
 $ ./submit --wait ddp-train.yaml
 ddp-train-386106
 $ grep -E "world=|step +50|rank 0/" ddp-train-386106.out
@@ -146,7 +146,7 @@ The 4.3 ms step time (5.3 ms on another run) is the simulated cost of the GEMMs 
 
 **Queueing.** Start a longer DDP run (a copy of `ddp-train.yaml` with `--steps 20000`), then submit `nvl8-hello` behind it. Kueue suspends the second JobSet and says why:
 
-```
+```console
 $ kubectl get workloads
 NAME                               QUEUE   RESERVED IN   ADMITTED   FINISHED   AGE
 jobset-ddp-long-408229-28e60       gpu     gpu           True                  26s
@@ -160,7 +160,7 @@ No pods are created while the workload is suspended, so nothing sits half-schedu
 
 **Cordoning a tray.** This is the Kubernetes half of the power-cycle runbook from [Part 4](@/ai-lab/04-bmc-redfish/index.md):
 
-```
+```console
 $ bin/kubectl cordon sched-worker2
 $ ./submit nvl8-hello.yaml
 nvl8-hello-664894
@@ -189,7 +189,7 @@ A Job that Kueue keeps suspended counts as `PENDING`, so the queue is visible ne
 
 The pods' GPU work is visible on the trays as it would be for any process. This is the same 60,000-step run:
 
-```
+```console
 $ bin/ssh sched-worker1 nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw,temperature.gpu --format=csv,noheader
 0, 86 %, 7850 MiB, 889.35 W, 69
 …

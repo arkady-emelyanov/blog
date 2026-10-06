@@ -1,0 +1,13 @@
+/* Console blocks (```console): commands at full strength, their output a bit
+   dimmed. A command line starts with the highlighted prompt ($ or #). */
+pre code[data-lang="shellsession"] .giallo-l {
+  opacity: 0.7;
+}
+
+pre code[data-lang="shellsession"] .giallo-l:has(> .z-4:first-child) {
+  opacity: 1;
+}
+
+pre code[data-lang="shellsession"]::before {
+  content: "console";
+}

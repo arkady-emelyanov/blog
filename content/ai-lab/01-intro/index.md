@@ -36,7 +36,7 @@ Nothing is actually computed. Tensors hold zeros, so the numbers coming out of a
 
 From the scheduler's point of view, a tray looks like this:
 
-```
+```console
 $ bin/ssh sched-worker1 nvidia-smi topo -m
 	GPU0	GPU1	GPU2	GPU3	CPU Affinity	NUMA Affinity	GPU NUMA ID
 GPU0	X	NV18	NV18	NV18	0-3	0		N/A
@@ -77,7 +77,7 @@ make test          # end-to-end checks
 
 `make init` doesn't run anything as root on the host. Instead it ends with a host check that prints the exact command for anything missing. The usual ones are group membership, an AppArmor rule so Incus' DNS works with NetworkManager, and the inotify and kernel-keyring limits that unprivileged containers run into. When the host is ready, it says so:
 
-```
+```console
 $ make check
 host ready
 ```
@@ -94,7 +94,7 @@ To switch on a built cluster, run `make down`, change the line, then `make up`. 
 
 When `make up` finishes, you have nine containers, each with a pinned address:
 
-```
+```console
 $ incus list --all-projects -c ns4 -f compact
          NAME          STATE           IPV4
   sched-control       RUNNING  10.107.111.10 (eth0)
@@ -118,7 +118,7 @@ bin/redfish sched-worker1 /redfish/v1/Systems/System_0
 
 A tray looks like any other GPU node:
 
-```
+```console
 $ bin/ssh sched-worker1 nvidia-smi
 +-----------------------------------------------------------------------------------------+
 | NVIDIA-SMI 580.95.05          Driver Version: 580.95.05          CUDA Version: 13.0     |

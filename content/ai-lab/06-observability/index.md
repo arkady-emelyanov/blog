@@ -34,7 +34,7 @@ So you watch every layer, and you put the layers next to each other. The run bel
 
 Prometheus on `sched-control` scrapes all of it:
 
-```
+```console
 $ curl -s http://10.107.111.10:9090/api/v1/targets | jq -r '.data.activeTargets[] | "\(.labels.job)\t\(.labels.instance)\t\(.health)"' | sort
 gpu	sched-worker1:9835	up
 gpu	sched-worker2:9835	up
