@@ -1,6 +1,6 @@
 ---
 image: "ai-lab/images/social/01-intro.png"
-description: "A GB200-class GPU cluster emulated on one Linux machine: what it is, what you can practise with it, and how to set it up."
+description: "A GB200-class GPU cluster emulated on a single Linux machine: what it is, what you can practise with it, and how to set it up."
 ---
 
 # AI lab, part 1: a GB200 GPU cluster on your laptop (minus the GPUs)
@@ -11,7 +11,7 @@ description: "A GB200-class GPU cluster emulated on one Linux machine: what it i
 
 Most of the work in AI infrastructure isn't the GPUs. It's everything around them: the scheduler that places an 8-GPU job inside one NVLink domain, the BMC you power-cycle a tray through at 3 a.m., the dashboard that shows which user is holding 6 of the 8 GPUs, the runbook for a degraded NVLink. Systems engineers who want to learn this hit a wall quickly: you can't practise on a GB200 rack you don't have, and cloud GPU instances hide exactly the layers you want to touch.
 
-[ai-lab](https://github.com/arkady-emelyanov/ai-lab) is my attempt at a way around that wall. It's a complete GPU cluster that runs on one Linux machine. The GPUs are fake, and everything around them is real.
+[ai-lab](https://github.com/arkady-emelyanov/ai-lab) is my attempt at a way around that wall. It's a complete GPU cluster that runs on a single Linux machine. The GPUs are fake, and everything around them is real.
 
 ## What it is
 

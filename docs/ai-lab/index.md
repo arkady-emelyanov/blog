@@ -3,12 +3,12 @@ hide:
   - navigation
   - toc
 image: "ai-lab/images/social/index.png"
-description: "A GPU cluster emulated on one Linux machine for systems engineers without GB200 hardware: setup, Slurm, Kubernetes, BMCs, NVLink, observability and networking."
+description: "A GPU cluster emulated on a single Linux machine for systems engineers without GB200 hardware: setup, Slurm, Kubernetes, BMCs, NVLink, observability and networking."
 ---
 
 # AI lab
 
-[ai-lab](https://github.com/arkady-emelyanov/ai-lab) is a complete GPU cluster that runs on one Linux machine: one NVIDIA GB200-class NVL8 NVLink domain, emulated in Incus containers, with Slurm or Kubernetes, BMCs, an NVLink switch tray, storage and monitoring around it. The GPUs are fake; everything around them is real.
+[ai-lab](https://github.com/arkady-emelyanov/ai-lab) is a complete GPU cluster that runs on a single Linux machine: one NVIDIA GB200-class NVL8 NVLink domain, emulated in Incus containers, with Slurm or Kubernetes, BMCs, an NVLink switch tray, storage and monitoring around it. The GPUs are fake; everything around them is real.
 
 > Independent personal project, not affiliated with or endorsed by NVIDIA. It emulates NVIDIA hardware interfaces in software for research and education.
 

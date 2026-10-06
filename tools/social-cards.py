@@ -41,7 +41,7 @@ ALL = {GPUS, SWITCH, LINKS, BMCS}
 
 CARDS = [
     dict(file="index", part=None,
-         headline="A GB200 GPU cluster on one Linux machine, in seven parts",
+         headline="A GB200 GPU cluster on a single Linux machine, in seven parts",
          chips=["Slurm · k3s", "Redfish BMCs", "NVLink", "Prometheus · Grafana"],
          focus=ALL, label="NVL8 domain, emulated"),
     dict(file="01-intro", part=1,
