@@ -1,0 +1,46 @@
+# Absolute URL of the published site: og:image needs it (LinkedIn wants absolute HTTPS).
+base_url = "https://www.example.com"
+title = "The Control Plane"
+description = "Hands-on AI infrastructure without the hardware."
+default_language = "en"
+theme = "tabi"
+compile_sass = true
+minify_html = true
+build_search_index = true
+
+[search]
+include_title = true
+include_description = true
+include_content = true
+index_format = "elasticlunr_json"
+
+[markdown]
+smart_punctuation = true
+
+[markdown.highlighting]
+theme = "catppuccin-frappe"
+style = "class"
+
+[extra]
+theme_switcher = true
+copy_button = true
+toc = true
+quick_navigation_buttons = true
+show_reading_time = true
+show_date = false
+show_remote_changes = false
+show_remote_source = false
+# links.css: site icons before external links (GitHub, NVIDIA docs, linuxcontainers.org).
+stylesheets = ["css/links.css"]
+# Default LinkedIn preview; posts set their own card in front matter.
+social_media_card = "ai-lab/card.png"
+favicon_emoji = "🎛️"
+
+menu = [
+    { name = "AI lab", url = "ai-lab", trailing_slash = true },
+]
+
+socials = [
+    { name = "GitHub", url = "https://github.com/arkady-emelyanov/", icon = "github" },
+    { name = "LinkedIn", url = "https://www.linkedin.com/in/arkadii-emelianov/", icon = "linkedin" },
+]

@@ -2,9 +2,9 @@
    has its own social icons), by domain. The GitHub mark is a mask in
    the text colour so it follows light and dark mode; the others are the
    sites' own favicons. */
-.md-content a[href^="https://github.com/"]::before,
-.md-content a[href^="https://linuxcontainers.org/"]::before,
-.md-content a[href^="https://docs.nvidia.com/"]::before {
+section.body a[href^="https://github.com/"]::before,
+section.body a[href^="https://linuxcontainers.org/"]::before,
+section.body a[href^="https://docs.nvidia.com/"]::before {
   content: "";
   display: inline-block;
   width: 1em;
@@ -14,16 +14,16 @@
   background: no-repeat center / contain;
 }
 
-.md-content a[href^="https://github.com/"]::before {
+section.body a[href^="https://github.com/"]::before {
   background-color: currentColor;
   -webkit-mask: url("../icons/github.svg") no-repeat center / contain;
   mask: url("../icons/github.svg") no-repeat center / contain;
 }
 
-.md-content a[href^="https://linuxcontainers.org/"]::before {
+section.body a[href^="https://linuxcontainers.org/"]::before {
   background-image: url("../icons/linuxcontainers.png");
 }
 
-.md-content a[href^="https://docs.nvidia.com/"]::before {
+section.body a[href^="https://docs.nvidia.com/"]::before {
   background-image: url("../icons/nvidia.png");
 }

@@ -1,4 +1,4 @@
 .omc/
 .venv/
-site/
-.cache/
+.bin/
+public/

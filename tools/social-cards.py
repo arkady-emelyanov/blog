@@ -3,9 +3,10 @@
 
     .venv/bin/python tools/social-cards.py
 
-One card per page of docs/ai-lab/, written to docs/ai-lab/images/social/.
-Headline and description come from each page (H1 and front-matter
-`description`), so the card says what LinkedIn's text below it says.
+One card per page of content/ai-lab/: card.png in each post's folder (the
+post's social_media_card) and content/ai-lab/card.png for the series. Headline
+and description come from each page's front matter (title, description), so
+the card says what LinkedIn's text below it says.
 Adapted from ai-lab's docs/assets/social-preview.py: the same look, with the
 part's number, headline and topics, and the cluster diagram highlighting the
 part's subject so the cards are distinguishable in a feed.
@@ -17,8 +18,7 @@ import textwrap
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 W, H = 1200, 627  # LinkedIn link preview, 1.91:1
-SERIES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "ai-lab")
-OUT = os.path.join(SERIES, "images", "social")
+SERIES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "content", "ai-lab")
 
 BG_TOP, BG_BOTTOM = (8, 12, 20), (17, 24, 39)
 GREEN = (118, 185, 0)          # NVIDIA green
@@ -69,13 +69,22 @@ CARDS = [
 PARTS = max(c["part"] or 0 for c in CARDS)
 
 
+def source(name):
+    """The page's Markdown file: the series section or a post's folder."""
+    return os.path.join(SERIES, "_index.md" if name == "index" else os.path.join(name, "index.md"))
+
+
+def output(name):
+    return os.path.join(SERIES, "card.png" if name == "index" else os.path.join(name, "card.png"))
+
+
 def page(name):
-    """(headline, description) of docs/ai-lab/<name>.md: the H1 without its
-    "AI lab, part N: " prefix, and the front-matter description."""
-    text = open(os.path.join(SERIES, name + ".md")).read()
-    title = re.search(r"^# (.+)$", text, re.M).group(1)
+    """(headline, description) from the page's front matter: the title without
+    its "AI lab, part N: " prefix, and the description."""
+    text = open(source(name)).read()
+    title = re.search(r'^title = "(.+)"$', text, re.M).group(1)
     title = re.sub(r"^AI lab, part \d+: ", "", title)
-    desc = re.search(r'^description: "(.+)"$', text, re.M)
+    desc = re.search(r'^description = "(.+)"$', text, re.M)
     return title[0].upper() + title[1:], desc.group(1) if desc else ""
 
 
@@ -194,8 +203,7 @@ def card(spec):
     d.text((x, 560), "Hands-on AI infrastructure without the hardware", font=regular(20), fill=MUTED)
     d.text((W - 50, 600), "github.com/arkady-emelyanov/ai-lab", font=regular(16), fill=MUTED, anchor="rs")
 
-    os.makedirs(OUT, exist_ok=True)
-    path = os.path.normpath(os.path.join(OUT, spec["file"] + ".png"))
+    path = os.path.normpath(output(spec["file"]))
     img.save(path, optimize=True)
     print(path)
 

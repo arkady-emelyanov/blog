@@ -1,13 +1,12 @@
----
-image: "ai-lab/images/social/02-slurm.png"
-description: "Running the emulated GB200 cluster with Slurm: GPU scheduling, jobs from srun to PyTorch DDP, drains, quotas and monitoring."
----
++++
+title = "AI lab, part 2: running an emulated GB200 cluster with Slurm"
+description = "Running the emulated GB200 cluster with Slurm: GPU scheduling, jobs from srun to PyTorch DDP, drains, quotas and monitoring."
 
-# AI lab, part 2: running an emulated GB200 cluster with Slurm
+[extra]
+social_media_card = "card.png"
++++
 
-*Series: [Intro](01-intro.md) · **Slurm** · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*
-
-[Part 1](01-intro.md) introduced the lab: one NVL8 NVLink domain with two trays of four fake GB200 GPUs, running on a single Linux machine. This post covers the default scheduler, Slurm 23.11. We'll read the cluster's state, look at how it's configured for GPUs, run jobs from a one-liner up to PyTorch DDP across both trays, do some routine operations, and watch all of it in Prometheus.
+[Part 1](@/ai-lab/01-intro/index.md) introduced the lab: one NVL8 NVLink domain with two trays of four fake GB200 GPUs, running on a single Linux machine. This post covers the default scheduler, Slurm 23.11. We'll read the cluster's state, look at how it's configured for GPUs, run jobs from a one-liner up to PyTorch DDP across both trays, do some routine operations, and watch all of it in Prometheus.
 
 Commands prefixed with `$` run on the login node as the directory user `joe` (`bin/ssh login`). Commands that start with `bin/` run from the repository root on the host.
 
@@ -71,7 +70,7 @@ NodeName=sched-worker1,sched-worker2 … RealMemory=7500 TmpDisk=51200 Gres=gpu:
   …
   ```
 
-- **`topology/block`** is the setting that matters for NVL-class systems. A block is a set of nodes that share an NVLink partition, and Slurm keeps jobs that fit in one block inside it. Nobody writes `topology.conf` by hand here. NVIDIA's [topograph](https://github.com/dsx-ai-factory/topograph) generates it every minute from the live fabric (more on that in [Part 5](05-nvlink.md)):
+- **`topology/block`** is the setting that matters for NVL-class systems. A block is a set of nodes that share an NVLink partition, and Slurm keeps jobs that fit in one block inside it. Nobody writes `topology.conf` by hand here. NVIDIA's [topograph](https://github.com/dsx-ai-factory/topograph) generates it every minute from the live fabric (more on that in [Part 5](@/ai-lab/05-nvlink/index.md)):
 
   ```
   $ scontrol show topology
@@ -165,7 +164,7 @@ JOBID PARTITION     NAME     USER ST  TIME  NODES NODELIST(REASON)
    17       gpu two-tray      joe PD  0:00      2 (Nodes required for job are DOWN, DRAINED or reserved for jobs in higher priority partitions)
 ```
 
-`scontrol update nodename=sched-worker2 state=resume` brings the node back, and job 17 runs within seconds. In [Part 4](04-bmc-redfish.md) we power-cycle a tray through its BMC, which is the other half of this runbook.
+`scontrol update nodename=sched-worker2 state=resume` brings the node back, and job 17 runs within seconds. In [Part 4](@/ai-lab/04-bmc-redfish/index.md) we power-cycle a tray through its BMC, which is the other half of this runbook.
 
 **GPU quotas.** Limits live on associations. Cap `joe` at four GPUs:
 
@@ -209,14 +208,14 @@ Compare that with the idle numbers from Part 1 (about 140 W, 32 °C, 0 %). Prome
 
 In Grafana (`http://10.107.111.10:3000`), **Lab overview** shows the per-GPU curves. In this run, all eight GPUs move together: utilisation jumps to 80–85 %, power to 810–870 W per GPU (about 7 kW for the domain), temperature climbs to 67–68 °C over a minute, and memory and processes appear as the job starts and disappear when it ends:
 
-![Lab overview during the DDP run in Slurm mode](images/slurm/lab-overview.png)
+![Lab overview during the DDP run in Slurm mode](lab-overview.png)
 
 **Scheduler & NVLink fabric** shows allocated versus total GPUs, GPUs per user and jobs by state. Here `nvl8-hello` waits as pending (yellow) under the running DDP job (blue) until the GPUs free up:
 
-![Jobs by state: job 2 running, job 3 pending until the GPUs free up](images/slurm/panel-jobs-by-state.png)
+![Jobs by state: job 2 running, job 3 pending until the GPUs free up](panel-jobs-by-state.png)
 
-Draining a node or submitting a job that can't run shows up there too, which makes the lab a convenient sandbox for building alerts. [Part 6](06-observability.md) walks through both dashboards panel by panel.
+Draining a node or submitting a job that can't run shows up there too, which makes the lab a convenient sandbox for building alerts. [Part 6](@/ai-lab/06-observability/index.md) walks through both dashboards panel by panel.
 
 ## Next in the series
 
-[Part 3: Kubernetes](03-kubernetes.md) rebuilds the same hardware with k3s, Kueue and JobSet, and runs the same four jobs as pods.
+[Part 3: Kubernetes](@/ai-lab/03-kubernetes/index.md) rebuilds the same hardware with k3s, Kueue and JobSet, and runs the same four jobs as pods.

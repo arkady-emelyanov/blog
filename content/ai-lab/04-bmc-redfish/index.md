@@ -1,13 +1,12 @@
----
-image: "ai-lab/images/social/04-bmc-redfish.png"
-description: "Out-of-band management of GPU trays with Redfish BMCs: inventory, GPU sensors, NVLink faults and power cycles."
----
++++
+title = "AI lab, part 4: BMCs and Redfish, the out-of-band side of a GPU rack"
+description = "Out-of-band management of GPU trays with Redfish BMCs: inventory, GPU sensors, NVLink faults and power cycles."
 
-# AI lab, part 4: BMCs and Redfish, the out-of-band side of a GPU rack
+[extra]
+social_media_card = "card.png"
++++
 
-*Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · **BMC and Redfish** · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*
-
-Parts [2](02-slurm.md) and [3](03-kubernetes.md) used the cluster the way its users do, through a scheduler. This part covers the operator's back door: the baseboard management controllers. We'll walk the Redfish tree, break NVLinks on purpose, power-cycle a tray, and see what the scheduler makes of it. The examples run in Slurm mode, but the BMCs are identical with Kubernetes.
+Parts [2](@/ai-lab/02-slurm/index.md) and [3](@/ai-lab/03-kubernetes/index.md) used the cluster the way its users do, through a scheduler. This part covers the operator's back door: the baseboard management controllers. We'll walk the Redfish tree, break NVLinks on purpose, power-cycle a tray, and see what the scheduler makes of it. The examples run in Slurm mode, but the BMCs are identical with Kubernetes.
 
 ## BMCs and Redfish in two paragraphs
 
@@ -114,7 +113,7 @@ temperature.gpu, power.draw [W]
 69, 870.59 W
 ```
 
-The temperature matches exactly. The power readings differ by about 20 W because the two commands ran a moment apart and a busy GPU's power jitters from sample to sample (a minute earlier, one `nvidia-smi` call read the same tray's four GPUs at 865–889 W). `Total_GPU_Power_0` sums the tray's four GPUs (3557.758 W at that moment). A Redfish exporter polls these sensors and the power state into Prometheus; [Part 6](06-observability.md) shows what that looks like during a power cycle.
+The temperature matches exactly. The power readings differ by about 20 W because the two commands ran a moment apart and a busy GPU's power jitters from sample to sample (a minute earlier, one `nvidia-smi` call read the same tray's four GPUs at 865–889 W). `Total_GPU_Power_0` sums the tray's four GPUs (3557.758 W at that moment). A Redfish exporter polls these sensors and the power state into Prometheus; [Part 6](@/ai-lab/06-observability/index.md) shows what that looks like during a power cycle.
 
 ## Operations
 
@@ -215,7 +214,7 @@ until bin/ssh sched-worker2 systemctl is-active slurmd 2>/dev/null | grep -qx ac
 bin/ssh sched-control 'scontrol update nodename=sched-worker2 state=resume'
 ```
 
-I ran exactly this script against the lab. The node goes `drained` → `idle*` (resumed, waiting for slurmd to check in) → `idle` within about 20 seconds. Finish by deleting the session (`rf -X DELETE $BMC/redfish/v1/SessionService/Sessions/<id>`). The Kubernetes version swaps `drain`/`resume` for `kubectl cordon`/`uncordon` and is covered in [Part 3](03-kubernetes.md).
+I ran exactly this script against the lab. The node goes `drained` → `idle*` (resumed, waiting for slurmd to check in) → `idle` within about 20 seconds. Finish by deleting the session (`rf -X DELETE $BMC/redfish/v1/SessionService/Sessions/<id>`). The Kubernetes version swaps `drain`/`resume` for `kubectl cordon`/`uncordon` and is covered in [Part 3](@/ai-lab/03-kubernetes/index.md).
 
 ## What to build against it
 
@@ -226,4 +225,4 @@ I ran exactly this script against the lab. The node goes `drained` → `idle*` (
 
 ## Next in the series
 
-[Part 5: NVLink](05-nvlink.md) moves from single links to the whole fabric: NVLink partitions, the controller that manages them, fabric telemetry, and how a partition change rewrites the scheduler's topology.
+[Part 5: NVLink](@/ai-lab/05-nvlink/index.md) moves from single links to the whole fabric: NVLink partitions, the controller that manages them, fabric telemetry, and how a partition change rewrites the scheduler's topology.

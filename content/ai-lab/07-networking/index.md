@@ -1,19 +1,18 @@
----
-image: "ai-lab/images/social/07-networking.png"
-description: "The networks of a GPU cluster, what the lab emulates for each, and where the emulation stops."
----
++++
+title = "AI lab, part 7: networking, and where the emulation stops"
+description = "The networks of a GPU cluster, what the lab emulates for each, and where the emulation stops."
 
-# AI lab, part 7: networking, and where the emulation stops
+[extra]
+social_media_card = "card.png"
++++
 
-*Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · **Networking***
-
-[Part 5](05-nvlink.md) covered NVLink, the fabric *inside* an NVLink domain. A real GPU cluster has several more networks, and this is the part of the lab that is emulated most thinly. This post goes through which networks a GB200-class system has, what the lab gives you for each, and what it doesn't model at all, so you know where its answers stop being meaningful. Outputs were captured in Kubernetes mode; the network side is the same in Slurm mode, minus the pod network.
+[Part 5](@/ai-lab/05-nvlink/index.md) covered NVLink, the fabric *inside* an NVLink domain. A real GPU cluster has several more networks, and this is the part of the lab that is emulated most thinly. This post goes through which networks a GB200-class system has, what the lab gives you for each, and what it doesn't model at all, so you know where its answers stop being meaningful. Outputs were captured in Kubernetes mode; the network side is the same in Slurm mode, minus the pod network.
 
 ## The networks of a GPU cluster
 
 | Network | Carries | In the lab |
 |---|---|---|
-| NVLink | GPU-to-GPU traffic inside one NVLink domain | emulated: links, partitions, health, traffic counters ([Part 5](05-nvlink.md)) |
+| NVLink | GPU-to-GPU traffic inside one NVLink domain | emulated: links, partitions, health, traffic counters ([Part 5](@/ai-lab/05-nvlink/index.md)) |
 | Compute fabric (InfiniBand or RoCE Ethernet) | GPU-to-GPU traffic *between* NVLink domains: the scale-out network | **topology only** |
 | Front-end Ethernet | logins, scheduler, storage, container images, everything else | real: the Incus bridge |
 | Out-of-band management | BMCs | shares the Incus bridge |
@@ -33,9 +32,9 @@ veth…@if2        UP             …
 eth0@if355       UP             10.107.111.21/24 metric 100 …
 ```
 
-`eth0` carries everything: SSH, the scheduler's control traffic, LDAP, S3 and JuiceFS, Prometheus scrapes, and the BMCs' Redfish. In Kubernetes mode `flannel.1` adds the pod network (a 10.42.x.0/24 per node) as VXLAN over the same `eth0`. That's where the DDP job's rendezvous happens: `torchrun` in pod 1 connects to pod 0 through the JobSet's DNS name ([Part 3](03-kubernetes.md#simple-jobs)).
+`eth0` carries everything: SSH, the scheduler's control traffic, LDAP, S3 and JuiceFS, Prometheus scrapes, and the BMCs' Redfish. In Kubernetes mode `flannel.1` adds the pod network (a 10.42.x.0/24 per node) as VXLAN over the same `eth0`. That's where the DDP job's rendezvous happens: `torchrun` in pod 1 connects to pod 0 through the JobSet's DNS name ([Part 3](@/ai-lab/03-kubernetes/index.md#simple-jobs)).
 
-The rendezvous is a handful of small messages. The training traffic itself, the gradients exchanged in every all-reduce, never touches the Ethernet side (`eth0` and the pod network on top of it). With the 8-GPU DDP job running ([Part 6](06-observability.md)), Prometheus showed:
+The rendezvous is a handful of small messages. The training traffic itself, the gradients exchanged in every all-reduce, never touches the Ethernet side (`eth0` and the pod network on top of it). With the 8-GPU DDP job running ([Part 6](@/ai-lab/06-observability/index.md)), Prometheus showed:
 
 | Query | Reading |
 |---|---|
@@ -73,7 +72,7 @@ sched-worker1   Ready    <none>   137m   v1.36.5+k3s1   7f3c2a10-5b4e-4d6a-9c1e-
 sched-worker2   Ready    <none>   137m   v1.36.5+k3s1   7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91.1   S-2c5eab036832a42e   S-2c5eab0306555424
 ```
 
-Kueue's `nvl` topology orders these as spine → leaf → NVLink domain → node, so a workload can require or prefer any of those levels; the lab's examples require one NVLink domain. In Slurm mode, topograph writes `topology.conf` instead ([Part 5](05-nvlink.md#how-the-scheduler-finds-out)). With one leaf and one spine, every tray shares every tier, so the switch levels never separate anything here. The emulator only knows one leaf: switch and HCA names and the HCA count are configurable (`ib_spine`, `ib_leaf`, `ib_hcas_per_node`), but a multi-leaf fabric would need changes to `fakeib` itself.
+Kueue's `nvl` topology orders these as spine → leaf → NVLink domain → node, so a workload can require or prefer any of those levels; the lab's examples require one NVLink domain. In Slurm mode, topograph writes `topology.conf` instead ([Part 5](@/ai-lab/05-nvlink/index.md#how-the-scheduler-finds-out)). With one leaf and one spine, every tray shares every tier, so the switch levels never separate anything here. The emulator only knows one leaf: switch and HCA names and the HCA count are configurable (`ib_spine`, `ib_leaf`, `ib_hcas_per_node`), but a multi-leaf fabric would need changes to `fakeib` itself.
 
 ## What isn't there
 
@@ -87,17 +86,17 @@ ls: cannot access '/sys/class/infiniband': No such file or directory
 The list of things the lab doesn't model is long, and worth knowing before you build on it:
 
 - **RDMA and GPUDirect.** No verbs devices, no RDMA traffic, no GPUDirect RDMA or GPUDirect Storage. NCCL's InfiniBand transport, and anything that tunes it (`NCCL_IB_HCA`, adaptive routing, rail alignment), has nothing to act on. The fake NCCL doesn't use a network at all.
-- **Fabric management.** No subnet manager, no UFM, no `ibdiagnet`, no port counters or link errors, so the scale-out layer of [Part 6](06-observability.md) has nothing to scrape. There are no partition keys either, so multi-tenant fabric isolation can't be tested.
+- **Fabric management.** No subnet manager, no UFM, no `ibdiagnet`, no port counters or link errors, so the scale-out layer of [Part 6](@/ai-lab/06-observability/index.md) has nothing to scrape. There are no partition keys either, so multi-tenant fabric isolation can't be tested.
 - **In-network computing.** No SHARP, so no switch-offloaded reductions.
 - **Ethernet compute fabrics.** No RoCE and no Spectrum-X; the compute fabric is InfiniBand-shaped only.
 - **BlueField DPUs.** No DPUs and nothing DOCA-based: no DPU-offloaded storage, networking or security, no host isolation enforced by the DPU, and no DPU BMC to manage. On real GB200 trays the front end goes through BlueField-3; in the lab it's a plain Linux interface.
 - **Separate networks.** Front end, storage, out-of-band management and the pod network all share one bridge, so "the management network is down while the cluster is fine" can't be rehearsed, and neither can a congested storage network.
 - **Scale.** One NVLink domain, one leaf, one spine. Real clusters have hundreds of leaves and the topology questions that come with them.
-- **Network faults.** There's no way to fail an InfiniBand link the way the BMCs fail an NVLink ([Part 4](04-bmc-redfish.md)). Network faults can only be imitated at the Linux level, for example with `tc` on the bridge.
+- **Network faults.** There's no way to fail an InfiniBand link the way the BMCs fail an NVLink ([Part 4](@/ai-lab/04-bmc-redfish/index.md)). Network faults can only be imitated at the Linux level, for example with `tc` on the bridge.
 
 ## What you can still do with it
 
-- Test **topology-aware placement** end to end: real `ibnetdiscover` format, real topograph, real Slurm `topology.conf` and Kueue labels. Combined with NVLink partitions ([Part 5](05-nvlink.md)), that's enough to see the scheduler's view change; a multi-leaf fabric is a natural extension of `fakeib`.
+- Test **topology-aware placement** end to end: real `ibnetdiscover` format, real topograph, real Slurm `topology.conf` and Kueue labels. Combined with NVLink partitions ([Part 5](@/ai-lab/05-nvlink/index.md)), that's enough to see the scheduler's view change; a multi-leaf fabric is a natural extension of `fakeib`.
 - Write and test **parsers and inventory tools** for `ibnetdiscover` output against a stable, known fabric.
 - Exercise the **front-end network**: storage throughput on JuiceFS, the Kubernetes pod network and its DNS, LDAP and S3 from jobs.
 - Make **wrong assumptions fail cheaply**. If your tooling expects `/sys/class/infiniband` or `ibstat`, the lab tells you right away, and that's a reminder to test that part on real hardware.

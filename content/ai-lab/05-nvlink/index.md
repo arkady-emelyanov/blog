@@ -1,13 +1,12 @@
----
-image: "ai-lab/images/social/05-nvlink.png"
-description: "NVLink partitions, fabric health and telemetry, and how a partition change reaches the scheduler."
----
++++
+title = "AI lab, part 5: NVLink partitions, fabric health and telemetry"
+description = "NVLink partitions, fabric health and telemetry, and how a partition change reaches the scheduler."
 
-# AI lab, part 5: NVLink partitions, fabric health and telemetry
+[extra]
+social_media_card = "card.png"
++++
 
-*Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · **NVLink** · [Observability](06-observability.md) · [Networking](07-networking.md)*
-
-[Part 4](04-bmc-redfish.md) broke individual NVLinks through the BMCs. This part steps back to the whole fabric. We'll cover what an NVLink domain and its partitions are, how to query and change them through the lab's partition controller, how a partition change ends up in the scheduler, and what the fabric looks like in Prometheus. The examples run in Slurm mode; the Kubernetes counterpart is noted where it differs.
+[Part 4](@/ai-lab/04-bmc-redfish/index.md) broke individual NVLinks through the BMCs. This part steps back to the whole fabric. We'll cover what an NVLink domain and its partitions are, how to query and change them through the lab's partition controller, how a partition change ends up in the scheduler, and what the fabric looks like in Prometheus. The examples run in Slurm mode; the Kubernetes counterpart is noted where it differs.
 
 ## The concepts
 
@@ -119,7 +118,7 @@ BlockName=block001 Nodes=sched-worker1
 BlockName=block002 Nodes=sched-worker2
 ```
 
-Each block is named after the cluster UUID and clique it was built from. In Kubernetes mode the same pipeline relabels the nodes instead (`accelerator.topograph.run/domain=<uuid>.<clique>`, plus GPU Feature Discovery's `nvidia.com/gpu.clique`). [Part 3](03-kubernetes.md) shows those labels.
+Each block is named after the cluster UUID and clique it was built from. In Kubernetes mode the same pipeline relabels the nodes instead (`accelerator.topograph.run/domain=<uuid>.<clique>`, plus GPU Feature Discovery's `nvidia.com/gpu.clique`). [Part 3](@/ai-lab/03-kubernetes/index.md) shows those labels.
 
 ### The surprise: an 8-GPU job still runs
 
@@ -152,7 +151,7 @@ nvswitch_ports_up{host="sched-nvswitch",switch="NVSwitch_0"} 72
 nvswitch_ports_up{host="sched-nvswitch",switch="NVSwitch_1"} 72
 ```
 
-With the 8-GPU DDP job from [Part 2](02-slurm.md) running (`sbatch ddp-train.sbatch --steps 60000`), Prometheus shows the all-reduce traffic:
+With the 8-GPU DDP job from [Part 2](@/ai-lab/02-slurm/index.md) running (`sbatch ddp-train.sbatch --steps 60000`), Prometheus shows the all-reduce traffic:
 
 | Query | Reading |
 |---|---|
@@ -171,4 +170,4 @@ The Grafana dashboard **Scheduler & NVLink fabric** puts these next to the sched
 
 ## Next in the series
 
-[Part 6: Observability](06-observability.md) puts all of this on dashboards: which layers of a GPU cluster to monitor, and how to read the graphs.
+[Part 6: Observability](@/ai-lab/06-observability/index.md) puts all of this on dashboards: which layers of a GPU cluster to monitor, and how to read the graphs.

@@ -1,11 +1,10 @@
----
-image: "ai-lab/images/social/01-intro.png"
-description: "A GB200-class GPU cluster emulated on a single Linux machine: what it is, what you can practise with it, and how to set it up."
----
++++
+title = "AI lab, part 1: a GB200 GPU cluster on your laptop (minus the GPUs)"
+description = "A GB200-class GPU cluster emulated on a single Linux machine: what it is, what you can practise with it, and how to set it up."
 
-# AI lab, part 1: a GB200 GPU cluster on your laptop (minus the GPUs)
-
-*Series: **Intro** · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*
+[extra]
+social_media_card = "card.png"
++++
 
 Most of the work in AI infrastructure isn't the GPUs. It's everything around them: the scheduler that places an 8-GPU job inside one NVLink domain, the BMC you power-cycle a tray through at 3 a.m., the dashboard that shows which user is holding 6 of the 8 GPUs, the runbook for a degraded NVLink. Systems engineers who want to learn this hit a wall quickly: you can't practise on a GB200 rack you don't have, and cloud GPU instances hide exactly the layers you want to touch.
 
@@ -144,4 +143,4 @@ It's not a performance model. Timings are approximations, and the fake NCCL rank
 
 ## Next in the series
 
-[Part 2: Slurm](02-slurm.md). We look at how the cluster is configured, run GPU jobs from `srun` up to PyTorch DDP across both trays, drain and resume nodes, and watch it all in Prometheus.
+[Part 2: Slurm](@/ai-lab/02-slurm/index.md). We look at how the cluster is configured, run GPU jobs from `srun` up to PyTorch DDP across both trays, drain and resume nodes, and watch it all in Prometheus.

@@ -1,15 +1,14 @@
----
-image: "ai-lab/images/social/03-kubernetes.png"
-description: "The same emulated GPU cluster on Kubernetes: GPU pods, Kueue topology-aware queueing, JobSet and monitoring."
----
++++
+title = "AI lab, part 3: the same GPU cluster on Kubernetes, with Kueue and JobSet"
+description = "The same emulated GPU cluster on Kubernetes: GPU pods, Kueue topology-aware queueing, JobSet and monitoring."
 
-# AI lab, part 3: the same GPU cluster on Kubernetes, with Kueue and JobSet
+[extra]
+social_media_card = "card.png"
++++
 
-*Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · **Kubernetes** · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*
+[Part 2](@/ai-lab/02-slurm/index.md) ran the lab under Slurm. This part rebuilds the same emulated hardware (two trays of four fake GB200 GPUs, one NVLink domain) with Kubernetes. We'll look at how GPUs and NVLink topology show up as Kubernetes objects, run the same jobs as pods, and see how Kueue queues them.
 
-[Part 2](02-slurm.md) ran the lab under Slurm. This part rebuilds the same emulated hardware (two trays of four fake GB200 GPUs, one NVLink domain) with Kubernetes. We'll look at how GPUs and NVLink topology show up as Kubernetes objects, run the same jobs as pods, and see how Kueue queues them.
-
-To switch, set `scheduler: k3s` in `inventory/group_vars/all.yml`, then run `make down && make up` ([Part 1](01-intro.md#setup)). Commands prefixed with `$` run on the login node as `joe` (`bin/ssh login`), whose kubeconfig and namespace are already set up. `bin/kubectl` on the host is cluster admin.
+To switch, set `scheduler: k3s` in `inventory/group_vars/all.yml`, then run `make down && make up` ([Part 1](@/ai-lab/01-intro/index.md#setup)). Commands prefixed with `$` run on the login node as `joe` (`bin/ssh login`), whose kubeconfig and namespace are already set up. `bin/kubectl` on the host is cluster admin.
 
 ## Runtime information
 
@@ -156,7 +155,7 @@ couldn't assign flavors to pod set rank: insufficient unused quota for nvidia.co
 
 No pods are created while the workload is suspended, so nothing sits half-scheduled holding GPUs. When the DDP run finishes, `nvl8-hello` is admitted and completes.
 
-**Cordoning a tray.** This is the Kubernetes half of the power-cycle runbook from [Part 4](04-bmc-redfish.md):
+**Cordoning a tray.** This is the Kubernetes half of the power-cycle runbook from [Part 4](@/ai-lab/04-bmc-redfish/index.md):
 
 ```
 $ bin/kubectl cordon sched-worker2
@@ -166,7 +165,7 @@ $ kubectl get workload … -o jsonpath='{.status.conditions[?(@.type=="QuotaRese
 couldn't assign flavors to pod set rank: topology "nvl" allows to fit only 4 out of 8 pod(s)
 ```
 
-Kueue sees that only one tray's worth of GPUs is schedulable inside the domain and holds the whole gang. After `bin/kubectl uncordon sched-worker2`, the JobSet is admitted and completes within 10 seconds. You'll see the same message again in [Part 5](05-nvlink.md), where splitting the NVLink domain has the same effect as cordoning.
+Kueue sees that only one tray's worth of GPUs is schedulable inside the domain and holds the whole gang. After `bin/kubectl uncordon sched-worker2`, the JobSet is admitted and completes within 10 seconds. You'll see the same message again in [Part 5](@/ai-lab/05-nvlink/index.md), where splitting the NVLink domain has the same effect as cordoning.
 
 ## Monitoring
 
@@ -183,7 +182,7 @@ Cluster state reaches Prometheus through kube-state-metrics (NodePort 30808): no
 
 A Job that Kueue keeps suspended counts as `PENDING`, so the queue is visible next to the allocation. In Grafana's *Scheduler & NVLink fabric* dashboard it shows up as a stacked band under the running job:
 
-![Jobs by state: the DDP job running, nvl8-hello pending underneath until the GPUs free up](images/panel-jobs-by-state.png)
+![Jobs by state: the DDP job running, nvl8-hello pending underneath until the GPUs free up](panel-jobs-by-state.png)
 
 The pods' GPU work is visible on the trays as it would be for any process. This is the same 60,000-step run:
 
@@ -199,8 +198,8 @@ $ kubectl exec ddp-long-205020-node-0-0-q8crt -- nvidia-smi --query-compute-apps
 …
 ```
 
-The same worker appears as PID 14832 on the tray and PID 16 inside the pod: each viewer sees the process under the PID from its own namespace, as with the real driver. [Part 6](06-observability.md) walks through both dashboards and what to read from each graph.
+The same worker appears as PID 14832 on the tray and PID 16 inside the pod: each viewer sees the process under the PID from its own namespace, as with the real driver. [Part 6](@/ai-lab/06-observability/index.md) walks through both dashboards and what to read from each graph.
 
 ## Next in the series
 
-[Part 4: BMC and Redfish](04-bmc-redfish.md) goes below the scheduler, to the management controllers that power trays on and off and switch NVLinks.
+[Part 4: BMC and Redfish](@/ai-lab/04-bmc-redfish/index.md) goes below the scheduler, to the management controllers that power trays on and off and switch NVLinks.

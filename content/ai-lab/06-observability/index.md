@@ -1,11 +1,10 @@
----
-image: "ai-lab/images/social/06-observability.png"
-description: "What to monitor on a GPU cluster, layer by layer, and how to read the graphs, from GPUs to BMCs."
----
++++
+title = "AI lab, part 6: observing a GPU cluster, layer by layer"
+description = "What to monitor on a GPU cluster, layer by layer, and how to read the graphs, from GPUs to BMCs."
 
-# AI lab, part 6: observing a GPU cluster, layer by layer
-
-*Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · **Observability** · [Networking](07-networking.md)*
+[extra]
+social_media_card = "card.png"
++++
 
 The earlier parts each peeked at a metric or two. This one is about monitoring as a whole: which layers of a GPU cluster need watching, what each layer's signals mean, and how to read the lab's Grafana dashboards. The screenshots come from one scripted 10-minute run on the lab in Kubernetes mode. The dashboards are identical in Slurm mode.
 
@@ -15,7 +14,7 @@ A GPU cluster can fail you at several layers, and each layer's metrics can look 
 
 - **Allocated isn't busy.** The scheduler says all 8 GPUs are taken, but the job holding them is stuck loading data and the GPUs sit idle.
 - **Busy isn't healthy.** The GPUs are busy, but one of them lost an NVLink, and a synchronised job runs at the speed of its slowest rank.
-- **Healthy isn't reachable.** Every GPU looked fine at the last scrape, but a tray was powered off through its BMC and the scheduler still counts its GPUs ([Part 4](04-bmc-redfish.md)).
+- **Healthy isn't reachable.** Every GPU looked fine at the last scrape, but a tray was powered off through its BMC and the scheduler still counts its GPUs ([Part 4](@/ai-lab/04-bmc-redfish/index.md)).
 
 So you watch every layer, and you put the layers next to each other. The run below shows the last two.
 
@@ -25,8 +24,8 @@ So you watch every layer, and you put the layers next to each other. The run bel
 |---|---|---|
 | GPUs | utilisation, memory, power, temperature, processes | `nvidia_gpu_exporter` on each tray (NVML), every 5 s |
 | Nodes and storage | CPU, RAM, disk, filesystem throughput | node_exporter; JuiceFS client metrics |
-| NVLink fabric | active links per GPU, switch ports up, partitions, traffic | `fakenmxc` on the switch tray host ([Part 5](05-nvlink.md)) |
-| Scale-out network (InfiniBand) | port state, link errors, congestion, throughput per HCA | **not in the lab**: the fabric is emulated as topology only, with no traffic or counters ([Part 7](07-networking.md)) |
+| NVLink fabric | active links per GPU, switch ports up, partitions, traffic | `fakenmxc` on the switch tray host ([Part 5](@/ai-lab/05-nvlink/index.md)) |
+| Scale-out network (InfiniBand) | port state, link errors, congestion, throughput per HCA | **not in the lab**: the fabric is emulated as topology only, with no traffic or counters ([Part 7](@/ai-lab/07-networking/index.md)) |
 | Scheduler | GPUs allocated vs total, per user, jobs and nodes by state | Slurm exporter or kube-state-metrics, mapped to `sched_*` series |
 | Out of band | tray power state, BMC health, GPU temperature from the BMC | Redfish exporter polling the three BMCs, every 30 s |
 
@@ -72,7 +71,7 @@ All the screenshots show the same window, in Grafana's local time:
 
 ## Reading the GPU layer
 
-![Lab overview dashboard during the scenario](images/lab-overview.png)
+![Lab overview dashboard during the scenario](lab-overview.png)
 
 **GPU utilisation** is the share of time a kernel was running on the GPU. It isn't a measure of how efficiently the GPU was used. All eight lines jump from 0 to 86–87 % together, stay flat, and drop together when the job ends. That's what healthy data-parallel training looks like: every rank does the same work at the same pace. A line or a group of lines sagging below the pack points to a **straggler**: a slow GPU, a degraded link, or a tray with CPU-side contention. On real hardware NCCL's collectives make every rank wait for the slowest one, so a straggler drags the whole job down while its own GPU looks the least busy. The lesson: compare GPUs against each other, not only against a threshold.
 
@@ -86,7 +85,7 @@ All the screenshots show the same window, in Grafana's local time:
 
 The bottom of the same dashboard puts the BMC's view next to the tray's own:
 
-![Tray power state from the BMCs vs the GPU exporters](images/panel-tray-power-state.png)
+![Tray power state from the BMCs vs the GPU exporters](panel-tray-power-state.png)
 
 Each row is a state timeline: green when the series is 1, red when it's 0. When `sched-worker2` was powered off at 16:14:51, the signals changed in this order:
 
@@ -110,15 +109,15 @@ The `sched-worker2 BMC` row stays green the whole time, and that's the point of 
 
 The last panel compares the hottest GPU per tray as NVML reports it (solid) and as the BMC's sensors report it (dashed):
 
-![Hottest GPU per tray: NVML vs BMC](images/panel-temperature-nvml-vs-bmc.png)
+![Hottest GPU per tray: NVML vs BMC](panel-temperature-nvml-vs-bmc.png)
 
 The lab's BMCs read the GPUs' state the way a real BMC reads them over its sideband bus, with the same model as NVML, so the values agree. The dashed lines still trail and step, because the BMC is polled every 30 s instead of every 5 s. Out-of-band data is the slower, coarser view. You keep it because it survives the host, not for its resolution.
 
 ## Reading the scheduler and fabric layers
 
-![Scheduler and NVLink fabric dashboard during the scenario](images/scheduler-fabric.png)
+![Scheduler and NVLink fabric dashboard during the scenario](scheduler-fabric.png)
 
-The top row compares supply with demand. The sparklines under **GPUs allocated**, **Running jobs** and **Pending jobs** show the history behind the current value of 0: allocation stays at 8 while the DDP job runs, and *Pending jobs* rises while `nvl8-hello` waits. Allocated close to total with jobs pending means the cluster is full, which is a capacity signal. Allocated below total with jobs pending means the jobs don't fit, either because of topology or quotas ([Part 3](03-kubernetes.md#operations)) or because a node is out.
+The top row compares supply with demand. The sparklines under **GPUs allocated**, **Running jobs** and **Pending jobs** show the history behind the current value of 0: allocation stays at 8 while the DDP job runs, and *Pending jobs* rises while `nvl8-hello` waits. Allocated close to total with jobs pending means the cluster is full, which is a capacity signal. Allocated below total with jobs pending means the jobs don't fit, either because of topology or quotas ([Part 3](@/ai-lab/03-kubernetes/index.md#operations)) or because a node is out.
 
 **GPUs total** is the trap in this row. It stayed at 8 while `sched-worker2` was off: Kubernetes keeps reporting a NotReady node's allocatable GPUs, so the capacity series only dipped to 4 for a moment as the tray came back (16:17:05–16:17:20). Read *GPUs total* together with **Nodes by state**, where the NOT_READY band (16:15:50–16:17:00) shows the tray was gone.
 
@@ -128,9 +127,9 @@ The top row compares supply with demand. The sparklines under **GPUs allocated**
 
 The **NVLink fabric** row turns Part 4's experiment into graphs. While the switch port is down, **Active NVLinks per GPU** shows `sched-worker1` GPU 2 dropping from 18 to 17 for that minute, and the *Unhealthy GPUs* and *Switch ports down* sparklines show the same minute:
 
-![Active NVLinks per GPU: one GPU drops to 17 links for a minute](images/panel-active-nvlinks.png)
+![Active NVLinks per GPU: one GPU drops to 17 links for a minute](panel-active-nvlinks.png)
 
-Utilisation didn't move when the link went down. In the lab, the fake NCCL doesn't slow a rank down for a lost link ([Part 5](05-nvlink.md)). On real hardware it may, and a rank missing 1 of 18 links is exactly the kind of fault you only catch by watching the fabric layer.
+Utilisation didn't move when the link went down. In the lab, the fake NCCL doesn't slow a rank down for a lost link ([Part 5](@/ai-lab/05-nvlink/index.md)). On real hardware it may, and a rank missing 1 of 18 links is exactly the kind of fault you only catch by watching the fabric layer.
 
 **NVLink TX per GPU** shows the all-reduce traffic: about 440 GB/s per GPU, the same on both trays. **NVSwitch throughput** shows the same traffic from the switch side, about 1.76 TB/s per chip. The two chips' lines diverge for a couple of minutes around the port change (about 1.3 and 2.2 TB/s): the lab attributes each GPU's traffic to its active links on each switch, so a link going down or coming back shifts the split between the chips. **GPUs per NVLink partition** stays at 8 in the default partition; a split like the one in Part 5 would show up there as two lines.
 
@@ -162,4 +161,4 @@ Everything above is simulated: utilisation comes from simulated busy time, power
 
 ## Next in the series
 
-[Part 7: Networking](07-networking.md) covers the scale-out side: the emulated InfiniBand fabric, how topology reaches the scheduler, and what the lab doesn't model, from RDMA traffic to BlueField DPUs.
+[Part 7: Networking](@/ai-lab/07-networking/index.md) covers the scale-out side: the emulated InfiniBand fabric, how topology reaches the scheduler, and what the lab doesn't model, from RDMA traffic to BlueField DPUs.
