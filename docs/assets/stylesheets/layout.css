@@ -1,0 +1,5 @@
+/* Card grids keep their column width when there are few cards, so a single
+   card (one series on the home page) doesn't stretch across the page. */
+.md-typeset .grid.cards {
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+}

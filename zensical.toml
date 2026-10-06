@@ -4,8 +4,8 @@ site_name = "Blog"
 site_url = "https://www.example.com/"
 docs_dir = "docs"
 site_dir = "site"
-# Site icons before external links (GitHub, NVIDIA docs, linuxcontainers.org).
-extra_css = ["assets/stylesheets/links.css"]
+# links.css: site icons before external links; layout.css: card grid columns.
+extra_css = ["assets/stylesheets/links.css", "assets/stylesheets/layout.css"]
 nav = [
   "index.md",
   { "AI lab" = [
