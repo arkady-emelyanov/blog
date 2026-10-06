@@ -1,5 +1,5 @@
 /* A wider page than tabi's default (1000px): text and code blocks share it;
-   tighter line spacing in articles (tabi: double-spaced). */
+   tighter line spacing in articles (tabi: double-spaced); tables left-aligned. */
 :root {
   --max-layout-width: 1200px;
 }
@@ -7,4 +7,10 @@
 article p,
 article li {
   line-height: 1.6;
+}
+
+/* Table text aligned left (tabi centres it). */
+article table,
+article table th {
+  text-align: start;
 }
