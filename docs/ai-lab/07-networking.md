@@ -7,8 +7,6 @@ description: "The networks of a GPU cluster, what the lab emulates for each, and
 
 *Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · **Networking***
 
-> Independent personal project, not affiliated with or endorsed by NVIDIA. It emulates NVIDIA hardware interfaces in software for research and education.
-
 [Part 5](05-nvlink.md) covered NVLink, the fabric *inside* an NVLink domain. A real GPU cluster has several more networks, and this is the part of the lab that is emulated most thinly. This post goes through which networks a GB200-class system has, what the lab gives you for each, and what it doesn't model at all, so you know where its answers stop being meaningful. Outputs were captured in Kubernetes mode; the network side is the same in Slurm mode, minus the pod network.
 
 ## The networks of a GPU cluster

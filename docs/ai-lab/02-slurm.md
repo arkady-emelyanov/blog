@@ -7,8 +7,6 @@ description: "Running the emulated GB200 cluster with Slurm: GPU scheduling, job
 
 *Series: [Intro](01-intro.md) · **Slurm** · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*
 
-> Independent personal project, not affiliated with or endorsed by NVIDIA. It emulates NVIDIA hardware interfaces in software for research and education.
-
 [Part 1](01-intro.md) introduced the lab: one NVL8 NVLink domain with two trays of four fake GB200 GPUs, running on a single Linux machine. This post covers the default scheduler, Slurm 23.11. We'll read the cluster's state, look at how it's configured for GPUs, run jobs from a one-liner up to PyTorch DDP across both trays, do some routine operations, and watch all of it in Prometheus.
 
 Commands prefixed with `$` run on the login node as the directory user `joe` (`bin/ssh login`). Commands that start with `bin/` run from the repository root on the host.

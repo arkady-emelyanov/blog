@@ -7,8 +7,6 @@ description: "Out-of-band management of GPU trays with Redfish BMCs: inventory, 
 
 *Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · **BMC and Redfish** · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*
 
-> Independent personal project, not affiliated with or endorsed by NVIDIA. It emulates NVIDIA hardware interfaces in software for research and education.
-
 Parts [2](02-slurm.md) and [3](03-kubernetes.md) used the cluster the way its users do, through a scheduler. This part covers the operator's back door: the baseboard management controllers. We'll walk the Redfish tree, break NVLinks on purpose, power-cycle a tray, and see what the scheduler makes of it. The examples run in Slurm mode, but the BMCs are identical with Kubernetes.
 
 ## BMCs and Redfish in two paragraphs

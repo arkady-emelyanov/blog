@@ -7,8 +7,6 @@ description: "A GB200-class GPU cluster emulated on a single Linux machine: what
 
 *Series: **Intro** · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*
 
-> Independent personal project, not affiliated with or endorsed by NVIDIA. It emulates NVIDIA hardware interfaces in software for research and education.
-
 Most of the work in AI infrastructure isn't the GPUs. It's everything around them: the scheduler that places an 8-GPU job inside one NVLink domain, the BMC you power-cycle a tray through at 3 a.m., the dashboard that shows which user is holding 6 of the 8 GPUs, the runbook for a degraded NVLink. Systems engineers who want to learn this hit a wall quickly: you can't practise on a GB200 rack you don't have, and cloud GPU instances hide exactly the layers you want to touch.
 
 [ai-lab](https://github.com/arkady-emelyanov/ai-lab) is my attempt at a way around that wall. It's a complete GPU cluster that runs on a single Linux machine. The GPUs are fake, and everything around them is real.

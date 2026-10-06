@@ -7,8 +7,6 @@ description: "The same emulated GPU cluster on Kubernetes: GPU pods, Kueue topol
 
 *Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · **Kubernetes** · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · [Observability](06-observability.md) · [Networking](07-networking.md)*
 
-> Independent personal project, not affiliated with or endorsed by NVIDIA. It emulates NVIDIA hardware interfaces in software for research and education.
-
 [Part 2](02-slurm.md) ran the lab under Slurm. This part rebuilds the same emulated hardware (two trays of four fake GB200 GPUs, one NVLink domain) with Kubernetes. We'll look at how GPUs and NVLink topology show up as Kubernetes objects, run the same jobs as pods, and see how Kueue queues them.
 
 To switch, set `scheduler: k3s` in `inventory/group_vars/all.yml`, then run `make down && make up` ([Part 1](01-intro.md#setup)). Commands prefixed with `$` run on the login node as `joe` (`bin/ssh login`), whose kubeconfig and namespace are already set up. `bin/kubectl` on the host is cluster admin.

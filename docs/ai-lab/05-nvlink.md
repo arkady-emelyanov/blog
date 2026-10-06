@@ -7,8 +7,6 @@ description: "NVLink partitions, fabric health and telemetry, and how a partitio
 
 *Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · **NVLink** · [Observability](06-observability.md) · [Networking](07-networking.md)*
 
-> Independent personal project, not affiliated with or endorsed by NVIDIA. It emulates NVIDIA hardware interfaces in software for research and education.
-
 [Part 4](04-bmc-redfish.md) broke individual NVLinks through the BMCs. This part steps back to the whole fabric. We'll cover what an NVLink domain and its partitions are, how to query and change them through the lab's partition controller, how a partition change ends up in the scheduler, and what the fabric looks like in Prometheus. The examples run in Slurm mode; the Kubernetes counterpart is noted where it differs.
 
 ## The concepts

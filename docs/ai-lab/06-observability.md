@@ -7,8 +7,6 @@ description: "What to monitor on a GPU cluster, layer by layer, and how to read 
 
 *Series: [Intro](01-intro.md) · [Slurm](02-slurm.md) · [Kubernetes](03-kubernetes.md) · [BMC and Redfish](04-bmc-redfish.md) · [NVLink](05-nvlink.md) · **Observability** · [Networking](07-networking.md)*
 
-> Independent personal project, not affiliated with or endorsed by NVIDIA. It emulates NVIDIA hardware interfaces in software for research and education.
-
 The earlier parts each peeked at a metric or two. This one is about monitoring as a whole: which layers of a GPU cluster need watching, what each layer's signals mean, and how to read the lab's Grafana dashboards. The screenshots come from one scripted 10-minute run on the lab in Kubernetes mode. The dashboards are identical in Slurm mode.
 
 ## Why one dashboard isn't enough
