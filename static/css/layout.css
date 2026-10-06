@@ -1,4 +1,10 @@
-/* A wider page than tabi's default (1000px): text and code blocks share it. */
+/* A wider page than tabi's default (1000px): text and code blocks share it;
+   tighter line spacing in articles (tabi: double-spaced). */
 :root {
   --max-layout-width: 1200px;
+}
+
+article p,
+article li {
+  line-height: 1.6;
 }
