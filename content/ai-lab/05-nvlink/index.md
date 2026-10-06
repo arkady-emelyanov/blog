@@ -32,67 +32,95 @@ index, fabric.cluster_uuid, fabric.clique_id
 …
 ```
 
-From the switch side, use `bin/grpcurl` (built on first use). Every client starts with `Hello`:
+From the switch side, `bin/nvlink` asks the partition controller:
 
 ```console
-$ nmx() { bin/grpcurl -plaintext -d "$2" 10.107.111.34:9370 nmxlab.v1.NMXController/$1; }
-$ nmx Hello '{"gateway_id": "me"}'
-{ "majorVersion": 1, "domainUuid": "7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91" }
-
-$ nmx GetDomainProperties '{"gateway_id": "me"}'
-{
-  "domainUuid": "7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91",
-  "domainName": "nvl8",
-  "computeNodeCount": 2,
-  "switchNodeCount": 1,
-  "gpuCount": 8,
-  "nvlinksPerGpu": 18,
-  "defaultPartitionId": 32766,
-  "maxPartitions": 32765
-}
+$ bin/nvlink domain
+domain      nvl8 (7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91)
+state       CONFIGURED
+trays       2 compute, 1 switch
+GPUs        8 x 18 NVLinks
+partitions  default 32766, at most 32765
 ```
 
 Out of the box, all 8 GPUs are in the **default partition**, ID 32766:
 
 ```console
-$ nmx GetPartitionInfoList '{"gateway_id": "me"}' | jq -c '.partitions[] | {partitionId, partitionName, gpus: (.gpuUids|length), state}'
-{"partitionId":32766,"partitionName":"default","gpus":8,"state":"ACTIVE"}
+$ bin/nvlink partitions
+ID     NAME     GPUS  STATE   HEALTH   MEMBERS
+32766  default  8     ACTIVE  healthy  sched-worker1:0-3 sched-worker2:0-3
 ```
 
-`GetTopologyInfo` lists all 144 GPU-to-switch connections, and `bin/grpcurl -plaintext 10.107.111.34:9370 describe nmxlab.v1.NMXController` lists every RPC.
+Every GPU has all 18 links active, 9 to each of the two NVSwitch chips:
+
+```console
+$ bin/nvlink topology
+TRAY           GPU  ACTIVE  NVSWITCH_0  NVSWITCH_1
+sched-worker1  0    18/18   9           9
+sched-worker1  1    18/18   9           9
+sched-worker1  2    18/18   9           9
+sched-worker1  3    18/18   9           9
+sched-worker2  0    18/18   9           9
+sched-worker2  1    18/18   9           9
+sched-worker2  2    18/18   9           9
+sched-worker2  3    18/18   9           9
+```
+
+`bin/nvlink` is a thin client over the controller's gRPC API: `--json` prints the raw responses, and `bin/grpcurl -plaintext 10.107.111.34:9370 describe nmxlab.v1.NMXController` lists every RPC.
 
 ## Health: a degraded GPU
 
-Remember the two NVLinks disabled through the tray BMC in Part 4? While they were down, the lab's controller rated that GPU as degraded (output trimmed to GPU 2):
+Remember the two NVLinks disabled through the tray BMC in Part 4? With them down, the lab's controller rates that GPU as degraded:
 
 ```console
-$ nmx GetGpuInfoList '{"gateway_id": "me", "slot_ids": [1]}'
-{ "uuid": "GPU-81502f39-…", "hostname": "sched-worker1", "location": {"slotId": 1, "gpuId": 2},
-  "partitionId": 32766, "cliqueId": 1, "activeNvlinks": 16, "health": "NMX_GPU_HEALTH_DEGRADED_BANDWIDTH" }
+$ bin/nvlink gpus sched-worker1
+TRAY           GPU  UUID                                      PARTITION  CLIQUE  NVLINKS  HEALTH
+sched-worker1  0    GPU-81501924-f170-f6d0-f2da-dc7595876881  32766      1       18       healthy
+sched-worker1  1    GPU-8150a4ae-478e-5534-f66c-621a95f85f59  32766      1       18       healthy
+sched-worker1  2    GPU-81502f39-9cad-de97-2723-3d7d71928458  32766      1       16       degraded
+sched-worker1  3    GPU-8151bac3-f1cc-3cd0-015f-475439ee933a  32766      1       18       healthy
 ```
 
 The same appears in metrics as `nvlink_gpu_active_links{host="sched-worker1",gpu="2"} 16` and `nvlink_gpu_healthy{…} 0`. `min(nvlink_gpu_healthy) == 0` makes a natural first alert.
 
-`DEGRADED_BANDWIDTH` is the lab's rating for a GPU with some links down. NVIDIA's [GB200 NVL Partition User's Guide](https://docs.nvidia.com/multi-node-nvlink-systems/partition-guide-v1-2.pdf) (§6.2) documents an access-link failure as marking the GPU `NO_NVLINK`, with the partition's workload running into errors, and the real health enum also has a `DEGRADED_BW` value.
+`degraded` (`NMX_GPU_HEALTH_DEGRADED_BANDWIDTH` in the API) is the lab's rating for a GPU with some links down. NVIDIA's [GB200 NVL Partition User's Guide](https://docs.nvidia.com/multi-node-nvlink-systems/partition-guide-v1-2.pdf) (§6.2) documents an access-link failure as marking the GPU `NO_NVLINK`, with the partition's workload running into errors, and the real health enum also has a `DEGRADED_BW` value.
 
 ## Operations: split the domain
 
-Give tray 2 its own partition. A GPU belongs to at most one partition, so you take it out of the default partition first:
+Give tray 2 its own partition. A GPU belongs to at most one partition, so creating the partition straight away fails:
 
 ```console
-$ gpus='[{"slot_id":2,"gpu_id":0},{"slot_id":2,"gpu_id":1},{"slot_id":2,"gpu_id":2},{"slot_id":2,"gpu_id":3}]'
-$ nmx RemoveGpusFromPartition "{\"gateway_id\": \"me\", \"partition_id\": 32766, \"locations\": $gpus}"
+$ bin/nvlink create tray2 --id 7 sched-worker2
+nvlink: CreatePartition: NMX_ST_GPU_IN_USE: GPU sched-worker2:0 is in partition 32766; remove it there first
+```
+
+Take the tray out of the default partition first:
+
+```console
+$ bin/nvlink remove default sched-worker2
+GPUs removed: 32766 default
+$ bin/nvlink partitions
+ID     NAME     GPUS  STATE   HEALTH   MEMBERS
+32766  default  4     ACTIVE  healthy  sched-worker1:0-3
+
+in no partition: sched-worker2:0-3
 $ bin/ssh sched-worker2 nvidia-smi --query-gpu=index,fabric.cliqueId --format=csv
 index, fabric.clique_id
 0, 0
-…
+1, 0
+2, 0
+3, 0
 ```
 
 Clique `0` means the GPU is in no partition. On real hardware that GPU now has no NVLink peers at all. Create the new partition:
 
 ```console
-$ nmx CreatePartition "{\"gateway_id\": \"me\", \"partition_name\": \"tray2\", \"partition_id\": 7, \"locations\": $gpus}"
-{ "message": "partition created", "partition": { "partitionId": 7, "partitionName": "tray2", … "state": "ACTIVE" } }
+$ bin/nvlink create tray2 --id 7 sched-worker2
+partition created: 7 tray2
+$ bin/nvlink partitions
+ID     NAME     GPUS  STATE   HEALTH   MEMBERS
+7      tray2    4     ACTIVE  healthy  sched-worker2:0-3
+32766  default  4     ACTIVE  healthy  sched-worker1:0-3
 $ bin/ssh sched-worker2 nvidia-smi --query-gpu=index,fabric.cliqueId --format=csv
 index, fabric.clique_id
 0, 7
@@ -140,7 +168,17 @@ Ranks 0–3 are in clique 1 and ranks 4–7 in clique 7. Slurm's `topology/block
 
 Kubernetes behaves differently. The lab's JobSets set `kueue.x-k8s.io/podset-required-topology` on the NVLink domain label, so Kueue keeps the same job queued rather than splitting it. The same partition change gives you two different scheduler behaviours, which makes the lab a good place to study them.
 
-Merge back with `DeletePartition` (its GPUs land in no partition) followed by `AddGpusToPartition` into 32766. The default block returns within a minute.
+Merge back by deleting the partition, which leaves its GPUs in no partition, and adding the tray to the default partition again. The default block returns within a minute:
+
+```console
+$ bin/nvlink delete tray2
+partition deleted; its GPUs are in no partition
+$ bin/nvlink add default sched-worker2
+GPUs added: 32766 default
+$ bin/nvlink partitions
+ID     NAME     GPUS  STATE   HEALTH   MEMBERS
+32766  default  8     ACTIVE  healthy  sched-worker1:0-3 sched-worker2:0-3
+```
 
 ## Telemetry
 
