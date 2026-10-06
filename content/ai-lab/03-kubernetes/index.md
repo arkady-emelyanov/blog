@@ -196,7 +196,7 @@ $ bin/ssh sched-worker1 nvidia-smi --query-gpu=index,utilization.gpu,memory.used
 $ bin/ssh sched-worker1 nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
 14832, /shared/venv/bin/python, 7338 MiB
 …
-$ kubectl exec ddp-long-205020-node-0-0-q8crt -- nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
+$ bin/kubectl -n joe exec ddp-long-205020-node-0-0-q8crt -- nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
 16, /shared/venv/bin/python, 7338 MiB
 …
 ```
