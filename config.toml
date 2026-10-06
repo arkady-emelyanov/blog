@@ -1,5 +1,5 @@
 # Absolute URL of the published site: og:image needs it (LinkedIn wants absolute HTTPS).
-base_url = "https://www.example.com"
+base_url = "https://blog.emelianov.cloud"
 title = "The Control Plane"
 description = "Notes on the infrastructure behind AI workloads, written for systems engineers."
 default_language = "en"
