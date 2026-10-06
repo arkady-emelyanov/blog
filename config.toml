@@ -30,8 +30,9 @@ show_reading_time = true
 show_date = true
 show_remote_changes = false
 show_remote_source = false
-# links.css: site icons before external links (GitHub, NVIDIA docs, linuxcontainers.org).
-stylesheets = ["css/links.css"]
+# links.css: site icons before external links (GitHub, NVIDIA docs, linuxcontainers.org);
+# layout.css: a wider page.
+stylesheets = ["css/links.css", "css/layout.css"]
 # Default LinkedIn preview; posts set their own card in front matter.
 social_media_card = "ai-lab/01-intro/card.png"
 favicon_emoji = "🎛️"

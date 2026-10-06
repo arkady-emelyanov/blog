@@ -1,0 +1,4 @@
+/* A wider page than tabi's default (1000px): text and code blocks share it. */
+:root {
+  --max-layout-width: 1200px;
+}
