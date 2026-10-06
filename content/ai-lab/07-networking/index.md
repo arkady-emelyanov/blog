@@ -4,8 +4,6 @@ description = "The networks of a GPU cluster, what the lab emulates for each, an
 
 [extra]
 social_media_card = "card.png"
-# Picture on the home page cards.
-local_image = "ai-lab/07-networking/card.png"
 +++
 
 [Part 5](@/ai-lab/05-nvlink/index.md) covered NVLink, the fabric *inside* an NVLink domain. A real GPU cluster has several more networks, and this is the part of the lab that is emulated most thinly. This post goes through which networks a GB200-class system has, what the lab gives you for each, and what it doesn't model at all, so you know where its answers stop being meaningful. Outputs were captured in Kubernetes mode; the network side is the same in Slurm mode, minus the pod network.

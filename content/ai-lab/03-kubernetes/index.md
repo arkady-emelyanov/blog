@@ -4,8 +4,6 @@ description = "The same emulated GPU cluster on Kubernetes: GPU pods, Kueue topo
 
 [extra]
 social_media_card = "card.png"
-# Picture on the home page cards.
-local_image = "ai-lab/03-kubernetes/card.png"
 +++
 
 [Part 2](@/ai-lab/02-slurm/index.md) ran the lab under Slurm. This part rebuilds the same emulated hardware (two trays of four fake GB200 GPUs, one NVLink domain) with Kubernetes. We'll look at how GPUs and NVLink topology show up as Kubernetes objects, run the same jobs as pods, and see how Kueue queues them.

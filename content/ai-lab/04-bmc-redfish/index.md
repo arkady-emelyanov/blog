@@ -4,8 +4,6 @@ description = "Out-of-band management of GPU trays with Redfish BMCs: inventory,
 
 [extra]
 social_media_card = "card.png"
-# Picture on the home page cards.
-local_image = "ai-lab/04-bmc-redfish/card.png"
 +++
 
 Parts [2](@/ai-lab/02-slurm/index.md) and [3](@/ai-lab/03-kubernetes/index.md) used the cluster the way its users do, through a scheduler. This part covers the operator's back door: the baseboard management controllers. We'll walk the Redfish tree, break NVLinks on purpose, power-cycle a tray, and see what the scheduler makes of it. The examples run in Slurm mode, but the BMCs are identical with Kubernetes.

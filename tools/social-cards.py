@@ -3,8 +3,8 @@
 
     .venv/bin/python tools/social-cards.py
 
-One card per page of content/ai-lab/: card.png in each post's folder (the
-post's social_media_card) and content/ai-lab/card.png for the series. Headline
+One card per post of content/ai-lab/: card.png in the post's folder (its
+social_media_card; the home page uses part 1's). Headline
 and description come from each page's front matter (title, description), so
 the card says what LinkedIn's text below it says.
 Adapted from ai-lab's docs/assets/social-preview.py: the same look, with the
@@ -18,7 +18,7 @@ import textwrap
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 W, H = 1200, 627  # LinkedIn link preview, 1.91:1
-SERIES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "content", "ai-lab")
+POSTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "content", "ai-lab")
 
 BG_TOP, BG_BOTTOM = (8, 12, 20), (17, 24, 39)
 GREEN = (118, 185, 0)          # NVIDIA green
@@ -40,10 +40,6 @@ GPUS, SWITCH, LINKS, BMCS, IB = "gpus", "switch", "links", "bmcs", "ib"
 ALL = {GPUS, SWITCH, LINKS, BMCS}
 
 CARDS = [
-    dict(file="index", part=None,
-         headline="A GB200 GPU cluster on a single Linux machine, in seven parts",
-         chips=["Slurm · k3s", "Redfish BMCs", "NVLink", "Prometheus · Grafana"],
-         focus=ALL, label="NVL8 domain, emulated"),
     dict(file="01-intro", part=1,
          chips=["Incus · Ansible", "CUDA · NVML · NCCL", "make up"],
          focus=ALL, label="2 trays · 8 GB200 · 1 switch tray"),
@@ -66,16 +62,15 @@ CARDS = [
          chips=["InfiniBand topology", "front-end Ethernet", "no RDMA · no DPUs"],
          focus={IB}, label="scale-out: leaf · spine"),
 ]
-PARTS = max(c["part"] or 0 for c in CARDS)
+PARTS = max(c["part"] for c in CARDS)
 
 
 def source(name):
-    """The page's Markdown file: the series section or a post's folder."""
-    return os.path.join(SERIES, "_index.md" if name == "index" else os.path.join(name, "index.md"))
+    return os.path.join(POSTS, name, "index.md")
 
 
 def output(name):
-    return os.path.join(SERIES, "card.png" if name == "index" else os.path.join(name, "card.png"))
+    return os.path.join(POSTS, name, "card.png")
 
 
 def page(name):
@@ -180,11 +175,10 @@ def card(spec):
     d = ImageDraw.Draw(img)
     x = 56
 
-    tag = "AI LAB · SERIES" if spec["part"] is None else f"AI LAB · PART {spec['part']} OF {PARTS}"
+    tag = f"AI LAB · PART {spec['part']} OF {PARTS}"
     chip(d, x, 56, tag, bold(16), fill=GPU_FILL, colour=GREEN)
 
     headline, desc = page(spec["file"])
-    headline = spec.get("headline", headline)
     y = 116
     for line in textwrap.wrap(headline, width=26):
         d.text((x, y), line, font=bold(44), fill=TEXT)

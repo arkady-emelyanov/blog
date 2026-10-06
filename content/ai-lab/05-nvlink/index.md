@@ -4,8 +4,6 @@ description = "NVLink partitions, fabric health and telemetry, and how a partiti
 
 [extra]
 social_media_card = "card.png"
-# Picture on the home page cards.
-local_image = "ai-lab/05-nvlink/card.png"
 +++
 
 [Part 4](@/ai-lab/04-bmc-redfish/index.md) broke individual NVLinks through the BMCs. This part steps back to the whole fabric. We'll cover what an NVLink domain and its partitions are, how to query and change them through the lab's partition controller, how a partition change ends up in the scheduler, and what the fabric looks like in Prometheus. The examples run in Slurm mode; the Kubernetes counterpart is noted where it differs.

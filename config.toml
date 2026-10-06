@@ -33,11 +33,12 @@ show_remote_source = false
 # links.css: site icons before external links (GitHub, NVIDIA docs, linuxcontainers.org).
 stylesheets = ["css/links.css"]
 # Default LinkedIn preview; posts set their own card in front matter.
-social_media_card = "ai-lab/card.png"
+social_media_card = "ai-lab/01-intro/card.png"
 favicon_emoji = "🎛️"
-
+# Header: the lab's repository. (tabi draws the search and theme buttons only
+# when the menu has an entry; its default menu lists demo sections.)
 menu = [
-    { name = "AI lab", url = "ai-lab", trailing_slash = true },
+    { name = "ai-lab", url = "https://github.com/arkady-emelyanov/ai-lab", trailing_slash = false },
 ]
 
 socials = [

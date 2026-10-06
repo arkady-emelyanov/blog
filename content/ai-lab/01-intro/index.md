@@ -4,8 +4,6 @@ description = "A GB200-class GPU cluster emulated on a single Linux machine: wha
 
 [extra]
 social_media_card = "card.png"
-# Picture on the home page cards.
-local_image = "ai-lab/01-intro/card.png"
 +++
 
 Most of the work in AI infrastructure isn't the GPUs. It's everything around them: the scheduler that places an 8-GPU job inside one NVLink domain, the BMC you power-cycle a tray through at 3 a.m., the dashboard that shows which user is holding 6 of the 8 GPUs, the runbook for a degraded NVLink. Systems engineers who want to learn this hit a wall quickly: you can't practise on a GB200 rack you don't have, and cloud GPU instances hide exactly the layers you want to touch.
