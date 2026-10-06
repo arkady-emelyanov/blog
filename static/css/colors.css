@@ -1,0 +1,15 @@
+/* A dimmed accent instead of tabi's bright teal (table headers, code block bars,
+   links, site title). Contrast on tabi's backgrounds: light 5.4:1, dark 7.6:1. */
+:root {
+  --primary-color: #4f6f7a;
+}
+
+[data-theme='dark'] {
+  --primary-color: #9bb5bd;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --primary-color: #9bb5bd;
+  }
+}

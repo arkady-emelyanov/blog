@@ -33,8 +33,8 @@ show_date = true
 show_remote_changes = false
 show_remote_source = false
 # links.css: site icons before external links (GitHub, NVIDIA docs, linuxcontainers.org);
-# layout.css: a wider page, line spacing, left-aligned tables.
-stylesheets = ["css/links.css", "css/layout.css"]
+# layout.css: a wider page, line spacing, left-aligned tables; colors.css: dimmed accent.
+stylesheets = ["css/links.css", "css/layout.css", "css/colors.css"]
 # Default LinkedIn preview; posts set their own card in front matter.
 social_media_card = "ai-lab/01-intro/card.png"
 favicon_emoji = "🎛️"
