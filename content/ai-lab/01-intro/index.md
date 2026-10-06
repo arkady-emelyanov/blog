@@ -111,7 +111,7 @@ $ incus list --all-projects -c ns4 -f compact
 The `bin/` wrappers look the addresses up in Incus, so you never need to type them:
 
 ```
-bin/ssh login                    # login node as joe (password: joe)
+bin/ssh login                    # login node as joe (joe's lab key, no password)
 bin/ssh root@sched-worker1       # any instance as root, with the generated admin key
 bin/redfish sched-worker1 /redfish/v1/Systems/System_0
 ```
