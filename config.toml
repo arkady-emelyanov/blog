@@ -1,7 +1,7 @@
 # Absolute URL of the published site: og:image needs it (LinkedIn wants absolute HTTPS).
 base_url = "https://www.example.com"
 title = "The Control Plane"
-description = "Hands-on AI infrastructure without the hardware."
+description = "Notes on the infrastructure behind AI workloads, written for systems engineers."
 default_language = "en"
 theme = "tabi"
 compile_sass = true

@@ -1,7 +1,7 @@
 +++
 # Heading of the post list; the browser tab shows the site name on the home page.
 title = "Posts"
-description = "Hands-on AI infrastructure without the hardware."
+description = "Notes on the infrastructure behind AI workloads, written for systems engineers."
 sort_by = "slug"
 paginate_by = 10
 
@@ -9,4 +9,4 @@ paginate_by = 10
 social_media_card = "ai-lab/01-intro/card.png"
 +++
 
-[AI lab](@/ai-lab/01-intro/index.md): a GB200-class GPU cluster emulated on a single Linux machine, for systems engineers who want hands-on time with AI infrastructure without the hardware. Seven parts: setup, Slurm, Kubernetes, BMCs and Redfish, NVLink, observability, networking.
+Notes on the infrastructure behind AI workloads: schedulers, GPUs and their fabrics, out-of-band management and monitoring. Written for systems engineers, with examples you can run yourself.
