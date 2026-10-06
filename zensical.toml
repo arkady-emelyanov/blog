@@ -56,6 +56,17 @@ primary = "indigo"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to system preference"
 
+# Footer: links to the author's profiles.
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/arkady-emelyanov/"
+name = "GitHub"
+
+[[project.extra.social]]
+icon = "fontawesome/brands/linkedin"
+link = "https://www.linkedin.com/in/arkadii-emelianov/"
+name = "LinkedIn"
+
 [project.markdown_extensions]
 admonition = {}
 attr_list = {}
