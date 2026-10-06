@@ -1,5 +1,6 @@
 +++
 title = "AI lab, part 5: NVLink partitions, fabric health and telemetry"
+date = 2026-10-02
 description = "NVLink partitions, fabric health and telemetry, and how a partition change reaches the scheduler."
 
 [extra]

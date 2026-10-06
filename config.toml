@@ -27,7 +27,7 @@ copy_button = true
 toc = true
 quick_navigation_buttons = true
 show_reading_time = true
-show_date = false
+show_date = true
 show_remote_changes = false
 show_remote_source = false
 # links.css: site icons before external links (GitHub, NVIDIA docs, linuxcontainers.org).

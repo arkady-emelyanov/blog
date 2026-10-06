@@ -1,5 +1,6 @@
 +++
 title = "AI lab, part 1: a GB200 GPU cluster on your laptop (minus the GPUs)"
+date = 2026-09-28
 description = "A GB200-class GPU cluster emulated on a single Linux machine: what it is, what you can practise with it, and how to set it up."
 
 [extra]

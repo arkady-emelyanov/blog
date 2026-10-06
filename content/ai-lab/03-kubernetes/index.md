@@ -1,5 +1,6 @@
 +++
 title = "AI lab, part 3: the same GPU cluster on Kubernetes, with Kueue and JobSet"
+date = 2026-09-30
 description = "The same emulated GPU cluster on Kubernetes: GPU pods, Kueue topology-aware queueing, JobSet and monitoring."
 
 [extra]

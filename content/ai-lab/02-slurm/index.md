@@ -1,5 +1,6 @@
 +++
 title = "AI lab, part 2: running an emulated GB200 cluster with Slurm"
+date = 2026-09-29
 description = "Running the emulated GB200 cluster with Slurm: GPU scheduling, jobs from srun to PyTorch DDP, drains, quotas and monitoring."
 
 [extra]

@@ -1,5 +1,6 @@
 +++
 title = "AI lab, part 6: observing a GPU cluster, layer by layer"
+date = 2026-10-03
 description = "What to monitor on a GPU cluster, layer by layer, and how to read the graphs, from GPUs to BMCs."
 
 [extra]

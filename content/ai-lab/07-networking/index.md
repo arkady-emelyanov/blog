@@ -1,5 +1,6 @@
 +++
 title = "AI lab, part 7: networking, and where the emulation stops"
+date = 2026-10-04
 description = "The networks of a GPU cluster, what the lab emulates for each, and where the emulation stops."
 
 [extra]

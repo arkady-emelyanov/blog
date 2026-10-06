@@ -1,5 +1,6 @@
 +++
 title = "AI lab, part 4: BMCs and Redfish, the out-of-band side of a GPU rack"
+date = 2026-10-01
 description = "Out-of-band management of GPU trays with Redfish BMCs: inventory, GPU sensors, NVLink faults and power cycles."
 
 [extra]
