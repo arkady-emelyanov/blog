@@ -8,5 +8,3 @@ paginate_by = 10
 [extra]
 social_media_card = "ai-lab/01-intro/card.png"
 +++
-
-Notes on the infrastructure behind AI workloads: schedulers, GPUs and their fabrics, out-of-band management and monitoring. Written for systems engineers, with examples you can run yourself.
