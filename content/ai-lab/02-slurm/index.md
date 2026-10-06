@@ -4,6 +4,8 @@ description = "Running the emulated GB200 cluster with Slurm: GPU scheduling, jo
 
 [extra]
 social_media_card = "card.png"
+# Picture on the home page cards.
+local_image = "ai-lab/02-slurm/card.png"
 +++
 
 [Part 1](@/ai-lab/01-intro/index.md) introduced the lab: one NVL8 NVLink domain with two trays of four fake GB200 GPUs, running on a single Linux machine. This post covers the default scheduler, Slurm 23.11. We'll read the cluster's state, look at how it's configured for GPUs, run jobs from a one-liner up to PyTorch DDP across both trays, do some routine operations, and watch all of it in Prometheus.

@@ -1,9 +1,12 @@
 +++
-title = "Posts"
+title = "The Control Plane"
 description = "Hands-on AI infrastructure without the hardware."
 
 [extra]
-section_path = "ai-lab/_index.md"
+# The series as picture cards (each post's local_image).
+projects_path = "ai-lab/_index.md"
+max_projects = 7
+projects_title = "AI lab"
 social_media_card = "ai-lab/card.png"
 +++
 
