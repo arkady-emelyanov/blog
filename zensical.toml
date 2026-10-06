@@ -1,7 +1,5 @@
 [project]
 site_name = "Blog"
-# Shown in the footer of every page.
-copyright = "AI lab is an independent personal project, not affiliated with or endorsed by NVIDIA. It emulates NVIDIA hardware interfaces in software for research and education."
 # Absolute URL of the published site: og:image needs it (LinkedIn wants absolute HTTPS).
 site_url = "https://www.example.com/"
 docs_dir = "docs"
