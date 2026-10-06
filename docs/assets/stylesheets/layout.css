@@ -3,3 +3,10 @@
 .md-typeset .grid.cards {
   grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
 }
+
+/* The theme reserves a scrollbar-wide strip on every page (scrollbar-gutter:
+   stable); on short pages it shows as a gap right of the header line and
+   footer. Let the scrollbar take space only when there is one. */
+html {
+  scrollbar-gutter: auto;
+}

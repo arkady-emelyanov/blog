@@ -4,7 +4,7 @@ site_name = "The Control Plane"
 site_url = "https://www.example.com/"
 docs_dir = "docs"
 site_dir = "site"
-# links.css: site icons before external links; layout.css: card grid columns.
+# links.css: site icons before external links; layout.css: card grid columns, no scrollbar gutter.
 extra_css = ["assets/stylesheets/links.css", "assets/stylesheets/layout.css"]
 nav = [
   "index.md",
