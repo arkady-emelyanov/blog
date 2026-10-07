@@ -1,0 +1,6 @@
+{#- GoatCounter on beacon.emelianov.cloud (config.extra.analytics). The path is prefixed with the blog's hostname, as the apex site reports into the same GoatCounter site. -#}
+{%- set host = config.base_url | replace(from="https://", to="") -%}
+<script async
+    data-goatcounter="{{ config.extra.analytics.url ~ '/count' }}"
+    data-goatcounter-settings='{"path": {{ (host ~ current_path) | json_encode | safe }}}'
+    src="{{ config.extra.analytics.url ~ '/count.js' }}"></script>

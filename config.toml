@@ -47,3 +47,40 @@ socials = [
     { name = "GitHub", url = "https://github.com/arkady-emelyanov/", icon = "github" },
     { name = "LinkedIn", url = "https://www.linkedin.com/in/arkadii-emelianov/", icon = "linkedin" },
 ]
+
+# Self-hosted GoatCounter (shared with the apex site, so paths are prefixed with the
+# blog's hostname). The service name isn't one tabi knows, so tabi only includes
+# templates/partials/analytics.html, which draws the script, and adds nothing to the CSP.
+[extra.analytics]
+service = "goatcounter-beacon"
+url = "https://beacon.emelianov.cloud/goatcounter"
+
+# tabi's default CSP, plus the GoatCounter host in script-src and connect-src. Those two
+# come first: tabi appends them at the end and would otherwise leave an empty directive.
+[[extra.allowed_domains]]
+directive = "script-src"
+domains = ["https://beacon.emelianov.cloud"]
+
+[[extra.allowed_domains]]
+directive = "connect-src"
+domains = ["https://beacon.emelianov.cloud"]
+
+[[extra.allowed_domains]]
+directive = "font-src"
+domains = ["'self'", "data:"]
+
+[[extra.allowed_domains]]
+directive = "img-src"
+domains = ["'self'", "https://*", "data:"]
+
+[[extra.allowed_domains]]
+directive = "media-src"
+domains = ["'self'"]
+
+[[extra.allowed_domains]]
+directive = "style-src"
+domains = ["'self'"]
+
+[[extra.allowed_domains]]
+directive = "frame-src"
+domains = ["player.vimeo.com", "https://www.youtube-nocookie.com"]
