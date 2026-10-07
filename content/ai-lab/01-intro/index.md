@@ -82,7 +82,7 @@ The lab's size (trays, GPUs per tray, switches) is fixed. "Hardware parameters" 
 
 Each GPU tray has `/dev/nvidia0-3` and stub versions of NVIDIA's software: the CUDA driver, NVML, cuBLAS, cuDNN, NCCL and `nvidia-smi`. The stubs implement the real APIs, so PyTorch and Ray run unmodified on top of them. Everything above the stubs is real:
 
-- **Slurm, k3s, Kueue, JobSet, topograph and GPU Feature Discovery** are real, with real configuration, scheduling, accounting and topology-aware placement. The differences are that Slurm jobs aren't confined by cgroups (the trays are containers sharing the host kernel), Slurm is version 23.11, and k3s gets its GPUs from the lab's own device plugin rather than NVIDIA's.
+- **Slurm, k3s, Kueue, JobSet, topograph and GPU Feature Discovery** are real, with real configuration, scheduling, accounting and topology-aware placement. A few things differ from a production cluster. Slurm jobs aren't confined by cgroups, because the trays are containers that share the host kernel. Slurm is version 23.11, which doesn't have the newer options for placing jobs across blocks (`--segment` and `BlockSizes`). And k3s gets its GPUs from the lab's own device plugin rather than NVIDIA's.
 - **PyTorch, Ray and your applications** are real and unmodified. They initialise, set up process groups and handle the errors the APIs below them return. Only their numerical results are meaningless.
 - **Prometheus, Grafana, LDAP and the storage** are real.
 
@@ -116,10 +116,20 @@ Read it as a table: each row and each column is one of the tray's four GPUs, and
 - `NUMA Affinity`: the NUMA node of the CPU closest to the GPU. A GB200 tray has two Grace CPUs, so GPUs 0-1 sit next to node 0 and GPUs 2-3 next to node 1
 - `GPU NUMA ID`: the NUMA node of the GPU's own memory (2, 10, 18 and 26). On GB200, the Grace CPU and the GPU can read and write each other's memory directly, so Linux treats each GPU's memory as another NUMA node: memory without CPUs, further from the CPU than its own
 
-The table shows the lab's current state, so it changes when the hardware does:
+The table shows the lab's current state, so it changes when the hardware does. Disable two of a GPU's NVLinks through the BMC, and `NV18` becomes `NV16` for that GPU ([Part 4](@/ai-lab/04-bmc-redfish/index.md)).
 
-- Disable two of a GPU's NVLinks through the BMC, and `NV18` becomes `NV16` for that GPU ([Part 4](@/ai-lab/04-bmc-redfish/index.md))
-- Move a tray into its own NVLink partition, and within a minute Slurm's topology or Kubernetes' node labels change ([Part 5](@/ai-lab/05-nvlink/index.md))
+A change travels through the whole stack the way it would on a real cluster. This is what happens when one tray is moved into an NVLink partition of its own ([Part 5](@/ai-lab/05-nvlink/index.md)):
+
+1. The partition controller moves the tray's GPUs to the new partition. As on GB200, they keep their old clique until they're reset.
+2. After a GPU reset, NVML reports the new clique (`nvidia-smi --query-gpu=fabric.cliqueId`).
+3. Within a minute, topograph rewrites Slurm's topology: one block per tray instead of one for both. With Kubernetes, it relabels the nodes instead.
+4. Slurm prefers to keep a job inside one block. An 8-GPU job no longer fits in one, so it spans both.
+5. The emulated NCCL sends the traffic between the two halves over InfiniBand instead of NVLink, and the same training job takes 2:39 instead of 1:17.
+6. Prometheus shows the shift: InfiniBand traffic rises to about 120 GB/s per tray, and NVLink traffic falls from 3.52 to 1.36 TB/s.
+
+{{< figure src="/ai-lab/05-nvlink/panel-nvlink-vs-ib.png" alt="Grafana panel: NVLink traffic at about 3.5 TB/s and no InfiniBand traffic during the first run; during the second run NVLink falls to about 1.4 TB/s and InfiniBand rises to about 240 GB/s" caption="NVLink vs InfiniBand traffic: the same DDP job on one partition, then split across two" />}}
+
+The times come from the timing model, so what matters is the chain of effects and their direction, not the exact numbers.
 
 ## What you can practise
 
@@ -176,6 +186,12 @@ make test          # end-to-end checks
 ```
 
 To switch the scheduler on a built cluster, run `make down`, change the line, then `make up`. Volumes survive the rebuild, so homes, the frameworks venv and object data are kept. The two modes never run side by side, but everything below the scheduler (GPUs, BMCs, fabric, storage, monitoring) is identical.
+
+The containers install their packages from Ubuntu's main mirror. If it's slow or times out from your network, set a closer [Ubuntu mirror](https://launchpad.net/ubuntu/+archivemirrors) in `local.yml` and run `make up` again. It continues where it stopped:
+
+```yaml
+apt_mirror: http://mirrors.ocf.berkeley.edu/ubuntu
+```
 
 {% <admonition type="tip" title="Setting up with a coding agent"> %}
 If you use an AI coding agent such as Claude Code, Codex or Cursor, you can ask it to set up the lab. The repository's [`AGENTS.md`](https://github.com/arkady-emelyanov/ai-lab/blob/main/AGENTS.md) tells it how: check the host without changing it, ask you once for the commands that need root and why, then build. For a running lab, the [ai-lab skill](https://github.com/arkady-emelyanov/ai-lab/blob/main/skills/ai-lab/SKILL.md) teaches the agent to run jobs, check GPUs, change NVLink partitions and query metrics, and to leave the lab as it found it. Claude Code picks the skill up automatically in the repository.

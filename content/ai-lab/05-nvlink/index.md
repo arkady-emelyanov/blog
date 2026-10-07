@@ -255,6 +255,12 @@ sum(rate(nvlink_gpu_tx_bytes_total[1m]))
 ~1.36 TB/s (3.52 TB/s on one partition)
 ```
 
+The "NVLink vs InfiniBand" panel of the Scheduler & NVLink fabric dashboard shows the same shift. I ran the job again with 30,000 steps, first on one partition, then split:
+
+{{< figure src="panel-nvlink-vs-ib.png" alt="Grafana panel: NVLink traffic at about 3.5 TB/s and no InfiniBand traffic during the first run; during the second run NVLink falls to about 1.4 TB/s and InfiniBand rises to about 240 GB/s" caption="NVLink vs InfiniBand panel: the same DDP job on one partition, then split across two" />}}
+
+During the first run, all the traffic goes over NVLink. During the split run, NVLink traffic drops to well under half, and InfiniBand carries the traffic between the trays: about 240 GB/s for the domain, 120 GB/s from each tray. The split run also lasts more than twice as long.
+
 The scheduler sees none of this: to Slurm both jobs are equally healthy. Only the step time and the InfiniBand counters show that the job is split.
 
 Kubernetes behaves differently. The lab's JobSets require all pods to be in one NVLink domain (`kueue.x-k8s.io/podset-required-topology`), so Kueue keeps the same job waiting instead of splitting it. Slurm runs the job split and slower, Kueue doesn't run it at all. Which is better depends on the job.
