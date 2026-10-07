@@ -14,3 +14,17 @@ article table,
 article table th {
   text-align: start;
 }
+
+/* Section levels that are easy to tell apart: h2 larger, with a rule above
+   and more space; h3 smaller and closer to its text. */
+article h2 {
+  font-size: 1.55rem;
+  margin-top: 2.2em;
+  padding-top: 0.7em;
+  border-top: 1px solid var(--divider-color);
+}
+
+article h3 {
+  font-size: 1.12rem;
+  margin-top: 1.6em;
+}

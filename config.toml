@@ -33,7 +33,7 @@ show_date = true
 show_remote_changes = false
 show_remote_source = false
 # links.css: site icons before external links (GitHub, NVIDIA docs, linuxcontainers.org);
-# layout.css: a wider page, line spacing, left-aligned tables; colors.css: dimmed accent;
+# layout.css: a wider page, line spacing, left-aligned tables, distinct h2/h3; colors.css: dimmed accent;
 # code.css: console blocks with commands at full strength and output dimmed.
 stylesheets = ["css/links.css", "css/layout.css", "css/colors.css", "css/code.css"]
 # Default LinkedIn preview; posts set their own card in front matter.

@@ -98,7 +98,9 @@ NodeName=sched-worker1,sched-worker2 … RealMemory=7500 TmpDisk=51200 Gres=gpu:
 
 ## Running jobs
 
-**GPU binding.** Slurm calls assigning specific GPUs to a task *binding* (see the `--gpu-bind` option). It tells each task which GPUs it may use through the `CUDA_VISIBLE_DEVICES` variable. Ask for 8 tasks with one GPU each and print the variable in every task:
+### GPU binding
+
+Slurm calls assigning specific GPUs to a task *binding* (see the `--gpu-bind` option). It tells each task which GPUs it may use through the `CUDA_VISIBLE_DEVICES` variable. Ask for 8 tasks with one GPU each and print the variable in every task:
 
 ```console
 $ srun -N2 --ntasks-per-node=4 --gpus-per-task=1 bash -c 'echo $(hostname) $CUDA_VISIBLE_DEVICES' | sort
@@ -114,7 +116,9 @@ sched-worker2 3
 
 The four tasks on each tray got GPUs 0, 1, 2 and 3, so no two tasks share a GPU.
 
-**CUDA only sees the GPUs the job asked for.** Ask for two GPUs and count them from PyTorch:
+### CUDA only sees the GPUs the job asked for
+
+Ask for two GPUs and count them from PyTorch:
 
 ```console
 $ srun -N1 --gpus-per-node=2 bash -c 'echo CVD=$CUDA_VISIBLE_DEVICES;
@@ -125,7 +129,9 @@ CVD=0,1
 
 `nvidia-smi` is different: inside the same job it still lists all four GPUs on the tray. Real `nvidia-smi` ignores `CUDA_VISIBLE_DEVICES` too. On a real cluster, Slurm usually hides the other GPUs with cgroups, but the lab's trays are containers without cgroup control, so all four stay visible. Keep that in mind if you write tooling that counts GPUs.
 
-**A batch job across the domain.** The examples from the repository (`bin/scp -r examples login:`) include `nvl8-hello.sbatch`, which runs eight tasks with one GPU each. In a distributed job each task has a number, its **rank**, from 0 to 7 here; ranks are how the tasks address each other. Every task reports its rank, its GPU's UUID and its NVLink clique:
+### A batch job across the domain
+
+The examples from the repository (`bin/scp -r examples login:`) include `nvl8-hello.sbatch`, which runs eight tasks with one GPU each. In a distributed job each task has a number, its **rank**, from 0 to 7 here; ranks are how the tasks address each other. Every task reports its rank, its GPU's UUID and its NVLink clique:
 
 ```console
 $ cd examples/slurm && sbatch --wait nvl8-hello.sbatch
@@ -140,7 +146,9 @@ job 14 on sched-worker[1-2]: 8 tasks
 
 All eight GPUs are in clique `1`, which is the same NVLink partition, so traffic between any two ranks can stay on NVLink. [Part 5](@/ai-lab/05-nvlink/index.md) splits the domain and shows what Slurm does when a job can't fit in one partition.
 
-**PyTorch DDP on 8 GPUs.** DDP (distributed data parallel) is the most common way to train on several GPUs: every GPU holds a copy of the model, trains on its own slice of the data, and after each step all GPUs average their gradients in an **all-reduce**. On this cluster, the all-reduce runs over NVLink. `ddp-train.sbatch` starts one `torchrun` per tray, with four ranks each, NCCL as the backend and rendezvous on the first node. It needs the frameworks venv (`make frameworks`), and extra arguments go straight to the training script:
+### PyTorch DDP on 8 GPUs
+
+DDP (distributed data parallel) is the most common way to train on several GPUs: every GPU holds a copy of the model, trains on its own slice of the data, and after each step all GPUs average their gradients in an **all-reduce**. On this cluster, the all-reduce runs over NVLink. `ddp-train.sbatch` starts one `torchrun` per tray, with four ranks each, NCCL as the backend and rendezvous on the first node. It needs the frameworks venv (`make frameworks`), and extra arguments go straight to the training script:
 
 ```console
 $ sbatch ddp-train.sbatch --steps 60000
@@ -156,7 +164,11 @@ The step time is simulated: it's roughly how long the matrix multiplications and
 
 ## Operations
 
-**Accounting.** Every job is recorded with its GPU allocation:
+These are the routine admin tasks: checking who used which GPUs, taking a node out for maintenance, and limiting how many GPUs a user can hold.
+
+### Accounting
+
+Every job is recorded with its GPU allocation:
 
 ```console
 $ sacct -X -o JobID,JobName,User,Account,AllocTRES%45,Elapsed,State
@@ -166,7 +178,9 @@ $ sacct -X -o JobID,JobName,User,Account,AllocTRES%45,Elapsed,State
 
 GPU-hour reports and chargeback are built on this data.
 
-**Draining a node for maintenance.** Draining tells Slurm to let running jobs finish but start no new ones on the node, so you can work on it without killing anyone's job. Run these as root on the controller (`bin/ssh sched-control`):
+### Draining a node for maintenance
+
+Draining tells Slurm to let running jobs finish but start no new ones on the node, so you can work on it without killing anyone's job. Run these as root on the controller (`bin/ssh sched-control`):
 
 ```console
 # scontrol update nodename=sched-worker2 state=drain reason="maintenance: BMC firmware"
@@ -188,7 +202,9 @@ The partitions in that message are **Slurm partitions**, not NVLink ones. A Slur
 
 `scontrol update nodename=sched-worker2 state=resume` brings the node back, and job 17 runs within seconds. In [Part 4](@/ai-lab/04-bmc-redfish/index.md) we power-cycle a tray through its BMC, which is the other half of this runbook.
 
-**GPU quotas.** Limits live on associations. Cap `joe` at four GPUs:
+### GPU quotas
+
+Limits live on associations. Cap `joe` at four GPUs:
 
 ```console
 # sacctmgr -i modify user joe set GrpTRES=gres/gpu=4
@@ -232,15 +248,30 @@ Here are some of them while the DDP job runs, with `nvl8-hello` submitted after 
 | `sum by (instance) (nvidia_smi_utilization_gpu_ratio)` | `3.32` and `3.38` per tray (4 GPUs × ~80 %) |
 | `sum(rate(nvlink_gpu_tx_bytes_total[1m]))` | ~3.4 TB/s of all-reduce traffic over NVLink |
 
-In Grafana (`http://10.107.111.10:3000`), **Lab overview** shows the per-GPU curves. In this run, all eight GPUs move together: utilisation jumps to 80–85 %, power to 810–870 W per GPU (about 7 kW for the domain), temperature climbs to 67–68 °C over a minute, and memory and processes appear as the job starts and disappear when it ends:
+### Lab overview dashboard
 
-![Lab overview during the DDP run in Slurm mode](lab-overview.png)
+Open Grafana (`http://10.107.111.10:3000`) and the **Lab overview** dashboard:
 
-**Scheduler & NVLink fabric** shows allocated versus total GPUs, GPUs per user and jobs by state. Here `nvl8-hello` waits as pending (yellow) under the running DDP job (blue) until the GPUs free up:
+{{< figure src="lab-overview.png" alt="Lab overview dashboard: GPU utilisation, memory, power, temperature and processes rising together while the DDP job runs" caption="Lab overview dashboard during the DDP run" />}}
 
-![Jobs by state: job 2 running, job 3 pending until the GPUs free up](panel-jobs-by-state.png)
+All eight GPUs move together:
 
-Draining a node or submitting a job that can't run shows up there too, which makes the lab a convenient sandbox for building alerts. [Part 6](@/ai-lab/06-observability/index.md) walks through both dashboards panel by panel.
+- **GPU utilisation** jumps to 80–85 % when the job starts and drops to 0 when it ends.
+- **GPU memory used** goes to about 7 GiB per GPU and stays there until the job ends.
+- **GPU power** goes from about 140 W to 810–870 W per GPU.
+- **GPU temperature** climbs to 67–68 °C over about a minute and cools slowly after the job.
+- **Processes on GPUs** shows 4 per tray, one per GPU.
+- **NVL8 domain power** is the total for all eight GPUs: about 7 kW.
+
+The panels at the bottom come from the BMCs; [Part 6](@/ai-lab/06-observability/index.md) covers them.
+
+### Scheduler & NVLink fabric dashboard
+
+This dashboard shows allocated versus total GPUs, GPUs per user and jobs by state. In **Jobs by state**, the DDP job is running (blue) and `nvl8-hello` is pending (yellow) until the GPUs free up. The panel is stacked, so the top line at 2 is both jobs together:
+
+{{< figure src="panel-jobs-by-state.png" alt="Jobs by state: one job running, one pending until the GPUs free up" caption="Jobs by state panel" />}}
+
+Draining a node or submitting a job that can't run shows up here too, which makes the lab a convenient place to build alerts. [Part 6](@/ai-lab/06-observability/index.md) walks through both dashboards panel by panel.
 
 ## Next in the series
 

@@ -1,0 +1,7 @@
+{#- An image with a caption under it: {{< figure src="x.png" caption="…" />}} -#}
+{% component figure(src: string, caption: string, alt = "") %}
+<figure>
+<img src="{{ src }}" alt="{{ alt | default(value=caption) }}">
+<figcaption>{{ caption }}</figcaption>
+</figure>
+{% endcomponent figure %}
