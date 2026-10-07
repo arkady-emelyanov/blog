@@ -4,10 +4,18 @@ date = 2026-10-02
 description = "NVLink partitions, fabric health and telemetry, and how a partition change reaches the scheduler."
 
 [extra]
+# Series navigation and table of contents are placed in the body (below).
+toc = false
 social_media_card = "card.png"
 # Thumbnail in the post list.
 local_image = "ai-lab/05-nvlink/card.png"
 +++
+
+<!-- series_intro -->
+
+<h3>Table of contents</h3>
+
+<!-- toc -->
 
 ## Overview
 
@@ -17,7 +25,7 @@ local_image = "ai-lab/05-nvlink/card.png"
 
 On a GB200 NVL72 rack each GPU has 18 NVLinks, one to each of the rack's 18 NVSwitch chips (9 switch trays × 2 chips). The lab models a single switch tray, so each GPU uses 9 links on each of its 2 chips. Together, GPUs and switches form one **NVLink domain**: any GPU can reach any other at NVLink speed, even across trays, without touching the network. That's why a 72-GPU rack can train like a single big machine.
 
-A domain is usually shared, so the switch trays can cut it into **partitions**, isolated groups of GPUs that can only talk to each other. They work much like VLANs on an Ethernet switch. NVIDIA's NMX Controller (NMX-C) manages them. Every GPU reports its partition to software as a **clique ID** (`nvidia-smi --query-gpu=fabric.cliqueId`).
+An NVLink domain is usually shared by several users or teams, so the switch trays can cut it into **partitions**, isolated groups of GPUs that can only talk to each other. They work much like VLANs on an Ethernet switch. NVIDIA's NMX Controller (NMX-C) manages them. Every GPU reports its partition to software as a **clique ID** (`nvidia-smi --query-gpu=fabric.cliqueId`).
 
 Schedulers care because a job whose ranks sit in different partitions can't use NVLink between them. The scheduler therefore needs to know the partition layout and keep jobs inside one partition. Partitions are configured on the switch side, not in the scheduler, so the layout has to be passed along. Most of this post is about how that happens.
 
@@ -183,13 +191,13 @@ index, fabric.clique_id
 
 ### How the scheduler finds out
 
-Nobody tells Slurm about this directly. Every minute, topograph on the controller collects `ibnetdiscover` and the NVML clique from every tray, and regenerates `topology.conf` when the result changes. It reads the clique from NVML, so it only sees the change after the reset. I polled `scontrol show topology` every 10 seconds after the reset, and the change landed about a minute later:
+Nobody tells Slurm about this directly. Every minute, topograph on the controller collects `ibnetdiscover` and the NVML clique from every tray, and regenerates `topology.conf` when the result changes. It reads the clique from NVML, so it only sees the change after the reset. I polled `scontrol show topology` every 10 seconds after the reset, and the change landed within the minute:
 
 ```
-20:03:36  GPUs reset
-20:03:36  BlockName=block001 BlockIndex=0 Nodes=sched-worker[1-2]
-…
-20:04:38  BlockName=block001 BlockIndex=0 Nodes=sched-worker1
+22:35:28  GPUs reset
+22:35:28  BlockName=block001 BlockIndex=0 Nodes=sched-worker[1-2]
+22:35:39  BlockName=block001 BlockIndex=0 Nodes=sched-worker[1-2]
+22:35:49  BlockName=block001 BlockIndex=0 Nodes=sched-worker1
           BlockName=block002 BlockIndex=1 Nodes=sched-worker2
 ```
 
@@ -208,19 +216,48 @@ Each block is named after the cluster UUID and clique it was built from. In Kube
 You might expect `nvl8-hello` (2 nodes × 4 GPUs) to wait now. It doesn't:
 
 ```console
-$ sbatch --wait nvl8-hello.sbatch && cat nvl8-hello-28.out
-job 28 on sched-worker[1-2]: 8 tasks
+$ sbatch --wait nvl8-hello.sbatch && cat nvl8-hello-7.out
+Submitted batch job 7
+job 7 on sched-worker[1-2]: 8 tasks
 0: rank 0 on sched-worker1 CUDA_VISIBLE_DEVICES=0: NVIDIA GB200, GPU-81501924-f170-f6d0-f2da-dc7595876881, 1, scratch  198G
 …
 4: rank 4 on sched-worker2 CUDA_VISIBLE_DEVICES=0: NVIDIA GB200, GPU-81477906-d580-de42-e868-ff62e9ef4317, 7, scratch  198G
 …
 ```
 
-Ranks 0 to 3 are in clique 1 and ranks 4-7 in clique 7. Slurm's `topology/block` *prefers* to keep a job inside one block, but a job larger than any block is allowed to span several. Newer Slurm versions can control this (`--segment`, `BlockSizes`), but the lab runs Slurm 23.11, which can't.
+Ranks 0-3 are in clique 1 and ranks 4-7 in clique 7. Slurm's `topology/block` *prefers* to keep a job inside one block, but a job larger than any block is allowed to span several. Newer Slurm versions can control this (`--segment`, `BlockSizes`), but the lab runs Slurm 23.11, which can't.
 
-On real hardware, the two halves of this job would talk over the network instead of NVLink, and the job would run slower. The lab doesn't show that: its emulated NCCL ignores cliques, so the job runs at the same speed.
+The job runs, but it's slower. The two halves can't reach each other over NVLink, so NCCL sends the traffic between them over InfiniBand, which is much slower: each GPU has a 400 Gb/s (50 GB/s) InfiniBand link, against hundreds of GB/s over NVLink. The lab's emulated NCCL does the same: inside each partition it uses NVLink, and between partitions it uses InfiniBand. Here is the same DDP job, 16,000 steps, first on one partition, then split across two:
 
-Kubernetes behaves differently. The lab's JobSets require all pods to be in one NVLink domain (`kueue.x-k8s.io/podset-required-topology`), so Kueue keeps the same job waiting instead of splitting it. Slurm runs the job split, Kueue doesn't run it at all. Which is better depends on the job.
+```console
+$ grep -E "^step +(10|50|16000) |rank 0/" ddp-train-6.out
+step   10      4.3 ms    119665 samples/s      48 TFLOP/s/GPU
+step   50      4.1 ms    125795 samples/s      51 TFLOP/s/GPU
+step 16000      4.4 ms    115490 samples/s      47 TFLOP/s/GPU
+rank 0/8 on sched-worker1 cuda:0 (NVIDIA GB200) peak mem 7.1 GiB
+
+$ grep -E "^step +(10|50|16000) |rank 0/" ddp-train-8.out
+step   10      9.8 ms     52224 samples/s      21 TFLOP/s/GPU
+step   50      9.3 ms     55250 samples/s      22 TFLOP/s/GPU
+step 16000      9.8 ms     52000 samples/s      21 TFLOP/s/GPU
+rank 0/8 on sched-worker1 cuda:0 (NVIDIA GB200) peak mem 7.1 GiB
+```
+
+Steps take more than twice as long, and the whole job took 2:39 instead of 1:17. During the split run, Prometheus showed the traffic moving to InfiniBand:
+
+```
+# InfiniBand traffic from each tray
+sum by (instance) (rate(node_infiniband_port_data_transmitted_bytes_total[1m]))
+~120 GB/s per tray (0 on one partition)
+
+# NVLink traffic for the whole domain
+sum(rate(nvlink_gpu_tx_bytes_total[1m]))
+~1.36 TB/s (3.52 TB/s on one partition)
+```
+
+The scheduler sees none of this: to Slurm both jobs are equally healthy. Only the step time and the InfiniBand counters show that the job is split.
+
+Kubernetes behaves differently. The lab's JobSets require all pods to be in one NVLink domain (`kueue.x-k8s.io/podset-required-topology`), so Kueue keeps the same job waiting instead of splitting it. Slurm runs the job split and slower, Kueue doesn't run it at all. Which is better depends on the job.
 
 Merge back by deleting the partition, adding the tray to the default partition again, and resetting its GPUs. The default block returns within a minute:
 
@@ -257,16 +294,16 @@ nvswitch_ports_up{host="sched-nvswitch",switch="NVSwitch_0"} 72
 nvswitch_ports_up{host="sched-nvswitch",switch="NVSwitch_1"} 72
 ```
 
-With the 8-GPU DDP job from [Part 2](@/ai-lab/02-slurm/index.md) running (`sbatch ddp-train.sbatch --steps 60000`), Prometheus shows the all-reduce traffic:
+With the 8-GPU DDP job from [Part 2](@/ai-lab/02-slurm/index.md) running on one partition (`sbatch ddp-train.sbatch --steps 60000`), Prometheus shows the all-reduce traffic:
 
 ```
 # NVLink traffic from each tray
 sum by (host) (rate(nvlink_gpu_tx_bytes_total[1m]))
-~1.68 TB/s per tray
+~1.76 TB/s per tray
 
 # traffic per NVSwitch chip (each GPU spreads its links over both)
 rate(nvswitch_tx_bytes_total[1m])
-~1.68 TB/s per chip
+~1.76 TB/s per chip
 
 # switch ports down
 sum(nvswitch_ports) - sum(nvswitch_ports_up)
@@ -277,13 +314,13 @@ min(nvlink_gpu_healthy)
 1
 ```
 
-The Grafana dashboard **Scheduler & NVLink fabric** puts these next to the scheduler panels: unhealthy GPUs, switch ports down, GPUs per partition, and NVLink and NVSwitch throughput. Disable a switch port as in Part 4 while DDP runs, and the *switch ports down* panel and the GPU's active-link count change within one scrape.
+The Grafana dashboard **Scheduler & NVLink fabric** puts these next to the scheduler panels: unhealthy GPUs, switch ports down, GPUs per partition, NVLink and NVSwitch throughput, and an InfiniBand row for traffic between partitions. Disable a switch port as in Part 4 while DDP runs, and the *switch ports down* panel and the GPU's active-link count change within one scrape.
 
 ## Ideas to build on this
 
-- **Partition-aware admission.** Reject or re-route jobs that would span cliques. That covers the Slurm 23.11 gap above, and you can test it on the lab.
+- **Partition-aware admission.** Reject or re-route jobs that would span cliques. That covers the Slurm 23.11 gap above, and the lab shows what it costs: twice the step time.
 - **Tenant isolation workflows.** Create a partition per tenant, assign GPUs, verify with NVML, and tear it down, all as code against the gRPC API.
-- **Fabric alerts.** Degraded GPUs, ports down and partition drift, wired to the same Prometheus as the scheduler metrics.
+- **Fabric alerts.** GPUs with links down, switch ports down, and InfiniBand traffic from a job that should stay on NVLink, wired to the same Prometheus as the scheduler metrics.
 
 ## Next in the series
 

@@ -4,10 +4,18 @@ date = 2026-10-03
 description = "What to monitor on a GPU cluster, layer by layer, and how to read the graphs, from GPUs to BMCs."
 
 [extra]
+# Series navigation and table of contents are placed in the body (below).
+toc = false
 social_media_card = "card.png"
 # Thumbnail in the post list.
 local_image = "ai-lab/06-observability/card.png"
 +++
+
+<!-- series_intro -->
+
+<h3>Table of contents</h3>
+
+<!-- toc -->
 
 ## Overview
 
@@ -90,7 +98,7 @@ All the screenshots show the same window, in Grafana's local time:
 
 The bottom of the same dashboard puts the BMC's view next to the tray's own:
 
-{{< figure src="panel-tray-power-state.png" caption="Tray power state from the BMCs vs the GPU exporters" />}}
+{{< figure src="panel-tray-power-state.png" caption="Tray power state panel: BMCs vs GPU exporters" />}}
 
 Each row is a state timeline: green when the series is 1, red when it's 0. When `sched-worker2` was powered off at 22:17:00, the signals changed in this order:
 
@@ -110,13 +118,13 @@ The `sched-worker2 BMC` row stays green the whole time: the BMC kept answering w
 
 The last panel compares the hottest GPU per tray as NVML reports it (solid) and as the BMC's sensors report it (dashed):
 
-{{< figure src="panel-temperature-nvml-vs-bmc.png" caption="Hottest GPU per tray: NVML vs BMC" />}}
+{{< figure src="panel-temperature-nvml-vs-bmc.png" caption="Hottest GPU per tray panel: NVML vs BMC" />}}
 
 The lab's BMCs read the GPUs' state the way a real BMC reads them over its sideband bus, with the same model as NVML, so the values agree. The dashed lines still trail and step, because the BMC is polled every 30 s instead of every 5 s. Out-of-band data is the slower, coarser view. You keep it because it survives the host, not for its resolution.
 
 ## Reading the scheduler and fabric layers
 
-{{< figure src="scheduler-fabric.png" caption="Scheduler and NVLink fabric dashboard during the scenario" />}}
+{{< figure src="scheduler-fabric.png" caption="Scheduler & NVLink fabric dashboard during the scenario" />}}
 
 The top row compares supply with demand. The sparklines under **GPUs allocated**, **Running jobs** and **Pending jobs** show the history behind the current value of 0: allocation stays at 8 while the DDP job runs, and *Pending jobs* rises while `nvl8-hello` waits. Allocated close to total with jobs pending means the cluster is full, which is a capacity signal. Allocated below total with jobs pending means the jobs don't fit, either because of topology or quotas ([Part 3](@/ai-lab/03-kubernetes/index.md#operations)) or because a node is out.
 
@@ -128,9 +136,9 @@ The top row compares supply with demand. The sparklines under **GPUs allocated**
 
 The **NVLink fabric** row turns Part 4's experiment into graphs. While the switch port is down, **Active NVLinks per GPU** shows `sched-worker1` GPU 2 dropping from 18 to 17 for that minute, and the *Unhealthy GPUs* and *Switch ports down* sparklines show the same minute:
 
-{{< figure src="panel-active-nvlinks.png" caption="Active NVLinks per GPU: one GPU drops to 17 links for a minute" />}}
+{{< figure src="panel-active-nvlinks.png" caption="Active NVLinks per GPU panel: one GPU drops to 17 links for a minute" />}}
 
-Utilisation didn't move when the link went down. In the lab, the emulated NCCL doesn't slow a rank down for a lost link ([Part 5](@/ai-lab/05-nvlink/index.md)). On real hardware it may, and a rank missing 1 of 18 links is exactly the kind of fault you only catch by watching the fabric layer.
+Utilisation didn't move when the link went down. In the lab, the emulated NCCL doesn't slow a rank down for a lost link; it only slows down when traffic has to cross NVLink partitions ([Part 5](@/ai-lab/05-nvlink/index.md)). On real hardware it may, and a rank missing 1 of 18 links is exactly the kind of fault you only catch by watching the fabric layer.
 
 **NVLink TX per GPU** shows the all-reduce traffic: about 445 GB/s per GPU, the same on both trays. **NVSwitch throughput** shows the same traffic from the switch side, about 1.77-1.79 TB/s per chip. **GPUs per NVLink partition** stays at 8 in the default partition; a split like the one in Part 5 would show up there as two lines.
 

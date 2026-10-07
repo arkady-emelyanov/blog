@@ -4,10 +4,18 @@ date = 2026-10-01
 description = "Out-of-band management of GPU trays with Redfish BMCs: inventory, GPU sensors, NVLink faults and power cycles."
 
 [extra]
+# Series navigation and table of contents are placed in the body (below).
+toc = false
 social_media_card = "card.png"
 # Thumbnail in the post list.
 local_image = "ai-lab/04-bmc-redfish/card.png"
 +++
+
+<!-- series_intro -->
+
+<h3>Table of contents</h3>
+
+<!-- toc -->
 
 ## Overview
 
@@ -182,10 +190,10 @@ $ bin/redfish sched-worker1 …/GPU_2/Ports/NVLink_3 | jq -c '{LinkState, LinkSt
 
 $ bin/ssh sched-worker1 nvidia-smi topo -m
 	GPU0	GPU1	GPU2	GPU3	CPU Affinity	NUMA Affinity	GPU NUMA ID
-GPU0	X	NV18	NV16	NV18	0-3	0		N/A
-GPU1	NV18	X	NV16	NV18	0-3	0		N/A
-GPU2	NV16	NV16	X	NV16	0-3	0		N/A
-GPU3	NV18	NV18	NV16	X	0-3	0		N/A
+GPU0	X	NV18	NV16	NV18	0-3	0		2
+GPU1	NV18	X	NV16	NV18	0-3	0		10
+GPU2	NV16	NV16	X	NV16	0-3	1		18
+GPU3	NV18	NV18	NV16	X	0-3	1		26
 …
 ```
 
@@ -200,7 +208,7 @@ $ bin/redfish sched-nvswitch /redfish/v1/Fabrics/MGX_NVLinkFabric_0/Switches/NVS
     -X PATCH -d '{"LinkState": "Disabled"}'
 
 $ bin/ssh sched-worker1 'nvidia-smi topo -m | grep ^GPU2; nvidia-smi nvlink -s -i 2 | grep "Link 2:"'
-GPU2	NV17	NV17	X	NV17	0-3	0		N/A
+GPU2	NV17	NV17	X	NV17	0-3	1		18
 	 Link 2: <inactive>
 ```
 

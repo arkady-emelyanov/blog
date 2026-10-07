@@ -4,10 +4,18 @@ date = 2026-09-30
 description = "The same emulated GPU cluster on Kubernetes: GPU pods, Kueue topology-aware queueing, JobSet and monitoring."
 
 [extra]
+# Series navigation and table of contents are placed in the body (below).
+toc = false
 social_media_card = "card.png"
 # Thumbnail in the post list.
 local_image = "ai-lab/03-kubernetes/card.png"
 +++
+
+<!-- series_intro -->
+
+<h3>Table of contents</h3>
+
+<!-- toc -->
 
 ## Overview
 
@@ -17,9 +25,9 @@ Slurm does GPU allocation, topology and queueing on its own. Kubernetes wasn't d
 
 I'll show which add-on does what, how GPUs and NVLink topology ([Part 1](@/ai-lab/01-intro/index.md#what-the-lab-is-made-of)) look in Kubernetes, how the same jobs run as pods, and how Kueue queues them.
 
-To switch, set `scheduler: k3s` in `inventory/group_vars/all.yml`, then run `make down && make up` ([Part 1](@/ai-lab/01-intro/index.md#setup)). Commands that start with `bin/` run on the host, from the repository root. All other commands run on the login node as `joe` (`bin/ssh login`), whose kubeconfig and namespace are already set up. `bin/kubectl` runs `kubectl` on the host with the cluster-admin kubeconfig; commands that need admin rights use it.
+To switch, set `scheduler: k3s` in `local.yml`, then run `make down && make up` ([Part 1](@/ai-lab/01-intro/index.md#setup)). Commands that start with `bin/` run on the host, from the repository root. All other commands run on the login node as `joe` (`bin/ssh login`), whose kubeconfig and namespace are already set up. `bin/kubectl` runs `kubectl` on the host with the cluster-admin kubeconfig; commands that need admin rights use it.
 
-## What Kubernetes sees
+## Looking at the cluster
 
 Kubernetes describes hardware with node **labels**, which pods and queues can select on. Two of them carry the NVLink topology, `nvidia.com/gpu.clique` and `accelerator.topograph.run/domain`:
 
@@ -258,11 +266,30 @@ sum by (instance) (nvidia_smi_compute_apps)
 4 per tray
 ```
 
-A Job that Kueue keeps suspended counts as `PENDING`, so the queue is visible next to the allocation. In Grafana's *Scheduler & NVLink fabric* dashboard, the **Jobs by state** panel shows `nvl8-hello` as a pending band (yellow) under the running DDP job (blue). The panel is stacked, so the top line at 2 is both jobs together. The short pending dip at the start is the DDP job itself, in the moment before Kueue admitted it:
+### Lab overview dashboard
 
-{{< figure src="panel-jobs-by-state.png" alt="Jobs by state: the DDP job running, nvl8-hello pending underneath until the GPUs free up" caption="Jobs by state panel" />}}
+Grafana's **Lab overview** dashboard shows the same DDP run on the trays:
 
-The pods' GPU work is visible on the trays as it would be for any process. This is the same 60,000-step run:
+{{< figure src="lab-overview.png" alt="Lab overview dashboard: GPU utilisation, memory, power, temperature and processes rising together while the DDP job runs in Kubernetes mode" caption="Lab overview dashboard during the DDP run" />}}
+
+All eight GPUs move together, as they did under Slurm:
+
+- **GPU utilisation** jumps to 87-88 % when the pods start and drops to 0 when they end.
+- **GPU memory used** goes to about 7 GiB per GPU and stays there until the job ends.
+- **GPU power** goes from about 140 W to 880-910 W per GPU.
+- **GPU temperature** climbs to 70 °C over about a minute. When the job ends it cools gradually: Kubernetes has no epilog to reset the GPUs, unlike Slurm ([Part 8](@/ai-lab/08-gpu-handover/index.md)).
+- **Processes on GPUs** shows 4 per tray, one per GPU.
+- **NVL8 domain power** is the total for all eight GPUs: about 7.1 kW, from 1.1 kW at idle.
+
+### Scheduler & NVLink fabric dashboard
+
+A Job that Kueue keeps suspended counts as `PENDING`, so the queue is visible next to the allocation. In the **Jobs by state** panel, the DDP job is running (blue), and `nvl8-hello` is pending (yellow) from the moment it's submitted until the GPUs free up. The panel is stacked, so the top line at 2 is both jobs together:
+
+{{< figure src="panel-jobs-by-state.png" alt="Jobs by state: the DDP job running, nvl8-hello pending underneath until the GPUs free up" caption="Jobs by state panel during the DDP run" />}}
+
+### On the trays
+
+While the job runs, the pods' GPU work is visible on the trays as it would be for any process:
 
 ```console
 $ bin/ssh sched-worker1 nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw,temperature.gpu --format=csv,noheader

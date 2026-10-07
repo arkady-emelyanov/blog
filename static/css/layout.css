@@ -43,3 +43,67 @@ article section.body > h2:first-child {
   margin-top: 0;
   padding-top: 0;
 }
+
+/* A smaller site title than tabi's (1.7em). */
+header .home-title {
+  font-size: 1.25em;
+}
+
+/* A soft gradient behind the header, from the page background down to a dim
+   tint of the accent colour, with a 2px line at the bottom, in both themes.
+   The border-image outset paints it across the whole window without widening
+   the page (no horizontal scroll). */
+header {
+  border-image: linear-gradient(
+      to bottom,
+      var(--background-color),
+      color-mix(in srgb, var(--primary-color) 14%, var(--background-color)) calc(100% - 2px),
+      color-mix(in srgb, var(--primary-color) 45%, var(--background-color)) calc(100% - 2px)
+    )
+    fill 0 / 0 / 0 100vmax;
+  margin-bottom: 1.5rem;
+}
+
+/* Series navigation (templates/components/series_page.html): an "All parts"
+   heading like "Table of contents", and below it the parts in one row,
+   "Part 1 · Part 2 · …", the current part in bold. */
+.series-page-intro {
+  margin-block-end: 3.5rem;
+}
+
+.series-page-intro h3 {
+  margin-top: 0.6rem;
+  margin-bottom: 0.3rem;
+}
+
+/* Under the date line, the series block follows directly. */
+article:has(.series-page-intro) ul.meta {
+  margin-bottom: 0;
+}
+
+/* The browser closes tabi's <p> before the heading and the list. */
+.series-page-intro p:empty {
+  display: none;
+}
+
+.series-page-intro ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.8rem;
+  margin: 0;
+  padding: 0;
+}
+
+.series-page-intro li {
+  list-style: none;
+}
+
+.series-page-intro li + li::before {
+  content: "·";
+  margin-inline-end: 0.8rem;
+  color: var(--meta-color);
+}
+
+.series-page-intro li[aria-current="page"] {
+  font-weight: 600;
+}

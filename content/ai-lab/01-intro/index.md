@@ -1,23 +1,48 @@
 +++
-title = "AI lab, part 1: a GB200 GPU cluster on your laptop (minus the GPUs)"
+title = "AI lab, part 1: GB200 NVL8 on your laptop (emulated)"
 date = 2026-09-28
 description = "A GB200-class GPU cluster emulated on a single Linux machine: what it is, what you can practise with it, and how to set it up."
 
 [extra]
+# Series navigation and table of contents are placed in the body (below).
+toc = false
 social_media_card = "card.png"
 # Thumbnail in the post list.
 local_image = "ai-lab/01-intro/card.png"
 +++
 
+<!-- series_intro -->
+
+<h3>Table of contents</h3>
+
+<!-- toc -->
+
 ## Overview
 
-Most of the work in AI infrastructure isn't the GPUs. It's everything around them: the scheduler that places an 8-GPU job inside one NVLink domain, the BMC you power-cycle a tray through at 3 a.m., the dashboard that shows which user is holding 6 of the 8 GPUs, the runbook for a degraded NVLink. Systems engineers who want to learn this hit a wall quickly: you can't practise on a GB200 rack you don't have, and cloud GPU instances hide exactly the layers you want to touch.
+Most of the work in AI infrastructure isn't the GPUs themselves. It's everything around them:
 
-Most of those layers never use a GPU for computation. Slurm reads a GPU count from its configuration and sets `CUDA_VISIBLE_DEVICES` for each job. The monitoring exporter calls NVML, NVIDIA's management library. The BMC answers Redfish requests over HTTPS. All of that works against GPUs that answer the right API calls, whether or not they compute anything.
+- the scheduler that places an 8-GPU job inside one NVLink domain
+- the BMC you use to power-cycle a tray that hangs
+- the dashboard that shows who is holding 6 of the 8 GPUs
+- the runbook for a broken NVLink
 
-[ai-lab](https://github.com/arkady-emelyanov/ai-lab) is my attempt at a way around that wall. It's a complete GPU cluster that runs on a single Linux machine. The GPUs are emulated, and everything around them is real. It works like a stub in a unit test: the GPU stack is replaced with an implementation of the same APIs, and the rest of the cluster runs against it unchanged.
+For systems and software engineers, this is hard to learn: you can't practise on a GB200 rack you don't have, and cloud GPU instances hide exactly these layers.
 
-![AI lab at a glance: an emulated GB200 NVL8 domain (NVLink switch tray, two GPU trays with 4 × GB200 each, BMCs, InfiniBand) plus login, control and storage instances, all inside a single Linux machine](overview.png)
+[ai-lab](https://github.com/arkady-emelyanov/ai-lab) is my attempt at a way around that. It's a complete GPU cluster that runs on a single Linux machine. The GPUs are emulated, but everything around them is real.
+
+That works because most of those layers never use a GPU for computation:
+
+- Slurm reads a GPU count from its configuration and sets `CUDA_VISIBLE_DEVICES` for each job.
+- The monitoring exporter calls NVML, NVIDIA's management library.
+- The BMC answers Redfish requests over HTTPS.
+
+All of that works against GPUs that answer the right API calls, whether or not they compute anything. It's like a stub in a unit test: the GPU stack is replaced with an implementation of the same APIs, and the rest of the cluster runs against it unchanged.
+
+{{< figure src="overview.png" alt="AI lab at a glance: an emulated GB200 NVL8 domain (NVLink switch tray, two GPU trays with 4 × GB200 each, BMCs, InfiniBand) plus login, control and storage instances, all inside a single Linux machine" caption="AI lab overview: the NVL8 domain and the platform instances" />}}
+
+{% <admonition type="note" title="What the lab is not"> %}
+It's not a performance model: timings are approximations, and the emulated NCCL ranks never exchange any data, so a dead peer doesn't hang a collective as it would on real hardware. It's not a scale model either: a single NVLink domain is enough to exercise every interface, but not to study a large cluster. Containers share the host kernel, so Slurm jobs aren't confined by cgroups, and the Kubernetes GPUs come from the lab's own device plugin rather than NVIDIA's. The repository's README lists the other limitations.
+{% </admonition> %}
 
 ## What the lab is made of
 
@@ -37,6 +62,17 @@ On top of that hardware runs the software of a real GPU cluster:
 
 Everything runs in Incus containers, set up by Ansible behind a `Makefile`. These are the same components a real cluster runs, except the Kubernetes device plugin, which the lab replaces with its own ([Part 3](@/ai-lab/03-kubernetes/index.md)).
 
+{% <admonition type="note" title="Hardware parameters"> %}
+The emulated hardware is set by variables. `inventory/group_vars/all.yml` has the defaults, the GB200 values used throughout this series. To change one, add it to `local.yml` and run `make configure`, which applies it without rebuilding the lab:
+
+- **GPU:** name, memory, NVLinks per GPU and their speed, power limit, and the compute and memory throughput the timing model uses
+- **Driver and firmware:** driver, CUDA and VBIOS versions, and the BMC, HMC and NVSwitch firmware, per tray if needed
+- **InfiniBand:** the link rate, from SDR to XDR
+- **NVLink domain:** the cluster UUID and the default clique ID
+
+The lab's size (trays, GPUs per tray, switches) is fixed. "Hardware parameters" in the lab's [`docs/platform.md`](https://github.com/arkady-emelyanov/ai-lab/blob/main/docs/platform.md) links to every variable.
+{% </admonition> %}
+
 ## Where the emulation stops
 
 Each GPU tray has `/dev/nvidia0-3` and stub versions of NVIDIA's software: the CUDA driver, NVML, cuBLAS, cuDNN, NCCL and `nvidia-smi`. The stubs implement the real APIs, so PyTorch and Ray run unmodified on top of them.
@@ -48,18 +84,29 @@ The stubs also model timing and telemetry, because schedulers, dashboards and ti
 
 Nothing is actually computed: tensors hold zeros, so the numbers from a training run mean nothing. Everything around the numbers works: scheduling, GPU binding, accounting, monitoring, failure handling and out-of-band management.
 
-From the scheduler's point of view, a tray looks like this:
+`nvidia-smi topo -m` shows how the GPUs in one tray are connected to each other. Here it runs on the first GPU tray, `sched-worker1`:
 
 ```console
 $ bin/ssh sched-worker1 nvidia-smi topo -m
-	GPU0	GPU1	GPU2	GPU3	CPU Affinity	NUMA Affinity	GPU NUMA ID
-GPU0	X	NV18	NV18	NV18	0-3	0		N/A
-GPU1	NV18	X	NV18	NV18	0-3	0		N/A
-GPU2	NV18	NV18	X	NV18	0-3	0		N/A
-GPU3	NV18	NV18	NV18	X	0-3	0		N/A
+GPU0	GPU1	GPU2	GPU3	CPU Affinity	NUMA Affinity	GPU NUMA ID
+GPU0	X	NV18	NV18	NV18	0-3	0		2
+GPU1	NV18	X	NV18	NV18	0-3	0		10
+GPU2	NV18	NV18	X	NV18	0-3	1		18
+GPU3	NV18	NV18	NV18	X	0-3	1		26
 ```
 
-Each `NV18` means the two GPUs are connected through 18 NVLinks. The matrix reflects the lab's current state, so changes made through other interfaces show up in it. If you disable two of a GPU's NVLinks through the BMC, `NV18` turns into `NV16` for that GPU. If you move a tray into its own NVLink partition, Slurm's block topology or Kubernetes' node labels change within a minute. Parts 4 and 5 are built around that feedback loop.
+Read it as a table: each row and each column is one of the tray's four GPUs, and each cell says how that pair is connected.
+
+- `X`: the GPU itself
+- `NV18`: the two GPUs are connected through 18 NVLinks, which carry their traffic together. At 50 GB/s per link, that's 900 GB/s in each direction
+- `CPU Affinity`: the CPU cores closest to the GPU
+- `NUMA Affinity`: the NUMA node of the CPU closest to the GPU. A GB200 tray has two Grace CPUs, so GPUs 0-1 sit next to node 0 and GPUs 2-3 next to node 1
+- `GPU NUMA ID`: the NUMA node of the GPU's own memory (2, 10, 18 and 26). On GB200, the Grace CPU and the GPU can read and write each other's memory directly, so Linux treats each GPU's memory as another NUMA node: memory without CPUs, further from the CPU than its own
+
+The table shows the lab's current state, so it changes when the hardware does:
+
+- Disable two of a GPU's NVLinks through the BMC, and `NV18` becomes `NV16` for that GPU ([Part 4](@/ai-lab/04-bmc-redfish/index.md))
+- Move a tray into its own NVLink partition, and within a minute Slurm's topology or Kubernetes' node labels change ([Part 5](@/ai-lab/05-nvlink/index.md))
 
 ## What you can practise
 
@@ -71,11 +118,11 @@ Each `NV18` means the two GPUs are connected through 18 NVLinks. The matrix refl
 
 ## Requirements
 
-- Linux with [Incus](https://linuxcontainers.org/incus/), plus `make`, Python 3, Go, `jq` and git.
-- Your user in the `incus-admin` group.
-- **RAM:** 16 GiB free (the running lab uses about 10 GiB).
-- **CPU:** 4 cores or more.
-- **Disk:** about 25 GB under `/var/lib/incus`, which includes a 5.6 GB PyTorch/Ray virtualenv.
+- Linux with [Incus](https://linuxcontainers.org/incus/), plus `make`, Python 3, Go, `jq` and git
+- Your user in the `incus-admin` group
+- **RAM:** 16 GiB free (the running lab uses about 10 GiB)
+- **CPU:** 4 cores or more (with enough cores, `make up` gives each GPU tray cores of its own, so the trays don't slow each other down)
+- **Disk:** about 25 GB under `/var/lib/incus`, including a 5.6 GB PyTorch/Ray virtualenv
 
 You don't need a GPU, an NVIDIA driver or a cloud account.
 
@@ -95,13 +142,13 @@ $ make check
 host ready
 ```
 
-Prepare the host side (Ansible venv, secrets, Go builds):
+Prepare the host side (Ansible venv, secrets, Go builds, and your settings file `local.yml`):
 
 ```
 make init
 ```
 
-Choose the scheduler. One line in `inventory/group_vars/all.yml` picks it:
+Choose the scheduler. `local.yml` holds your settings, and one line in it picks the scheduler:
 
 ```yaml
 scheduler: slurm        # or: k3s
@@ -116,6 +163,10 @@ make test          # end-to-end checks
 ```
 
 To switch the scheduler on a built cluster, run `make down`, change the line, then `make up`. Volumes survive the rebuild, so homes, the frameworks venv and object data are kept. The two modes never run side by side, but everything below the scheduler (GPUs, BMCs, fabric, storage, monitoring) is identical.
+
+{% <admonition type="tip" title="Setting up with a coding agent"> %}
+If you use an AI coding agent such as Claude Code, Codex or Cursor, you can ask it to set up the lab. The repository's [`AGENTS.md`](https://github.com/arkady-emelyanov/ai-lab/blob/main/AGENTS.md) tells it how: check the host without changing it, ask you once for the commands that need root and why, then build. For a running lab, the [ai-lab skill](https://github.com/arkady-emelyanov/ai-lab/blob/main/skills/ai-lab/SKILL.md) teaches the agent to run jobs, check GPUs, change NVLink partitions and query metrics, and to leave the lab as it found it. Claude Code picks the skill up automatically in the repository.
+{% </admonition> %}
 
 ## First contact
 
@@ -135,10 +186,14 @@ $ incus list --all-projects -c ns4 -f compact
   sched-worker2-bmc   RUNNING  10.107.111.32 (eth0)
 ```
 
-These map one to one onto the overview picture: the two GPU trays are `sched-worker1` and `sched-worker2`, the switch tray is `sched-nvswitch`, and every tray has its own `-bmc` container. The lab has one regular user, `joe`, an OpenLDAP account that works on every node. The rest of the series uses `joe` for everything a cluster user would do. The `bin/` wrappers look the addresses up in Incus, so you never need to type them:
+These map one to one onto the overview picture: the two GPU trays are `sched-worker1` and `sched-worker2`, the switch tray is `sched-nvswitch`, and every tray has its own `-bmc` container.
+
+The lab has one regular user, `joe`, an OpenLDAP account that works on every node. The rest of the series uses `joe` for everything a cluster user would do.
+
+The repository's `bin/` folder has small helper scripts for working with the lab from the host. `bin/ssh` logs in to a container with the lab's SSH keys, and `bin/redfish` sends a request to a tray's BMC. They find each container's address in Incus, so you never type an IP address:
 
 ```
-bin/ssh login                    # login node as joe (joe's lab key, no password)
+bin/ssh login                    # login node as joe
 bin/ssh root@sched-worker1       # any instance as root, with the generated admin key
 bin/redfish sched-worker1 /redfish/v1/Systems/System_0   # a tray's BMC over Redfish (Part 4)
 ```
@@ -157,10 +212,6 @@ $ bin/ssh sched-worker1 nvidia-smi
 ```
 
 All of these values come from the stub NVML, including the driver version, the 189,471 MiB of memory and the 1,200 W power limit. The trays idle at about 140 W and 32 °C. Start a job and those numbers climb, and the same values show up in Prometheus (`http://10.107.111.10:9090`) and Grafana (`http://10.107.111.10:3000`, user `admin`, password in `.secrets/grafana.pass`). Keep the **Lab overview** dashboard open while you work through the rest of the series.
-
-## What it is not
-
-It's not a performance model. Timings are approximations, and the emulated NCCL ranks never talk to each other, so a dead peer doesn't hang a collective the way it would on real hardware. It's also not a scale model: it has one NVLink domain, one switch tray and one InfiniBand leaf, which is enough to exercise every interface but nothing more. Containers share the host kernel, so Slurm jobs aren't cgroup-confined, and the Kubernetes GPUs come from the lab's own device plugin rather than NVIDIA's. The repository's README lists the remaining limitations.
 
 ## Next in the series
 

@@ -1,13 +1,21 @@
 +++
 title = "AI lab, part 8: GPU handover"
 date = 2026-10-06
-description = "Why GPUs are reset between tenants and after NVLink partition changes, and how the lab does it with nvidia-smi --gpu-reset and a Slurm epilog."
+description = "Why GPUs are reset between tenants and after NVLink partition changes, and how the lab does it with nvidia-smi and a Slurm epilog."
 
 [extra]
+# Series navigation and table of contents are placed in the body (below).
+toc = false
 social_media_card = "card.png"
 # Thumbnail in the post list.
 local_image = "ai-lab/08-gpu-handover/card.png"
 +++
+
+<!-- series_intro -->
+
+<h3>Table of contents</h3>
+
+<!-- toc -->
 
 ## Overview
 
@@ -232,7 +240,7 @@ sched-worker2 idle
 
 To recover, find and stop the process, reset the GPU (`bin/ssh sched-worker1 nvidia-smi --gpu-reset -i 0`), and resume the node (`bin/ssh sched-control 'scontrol update nodename=sched-worker1 state=resume'`).
 
-The handover is on by default. `gpu_handover_reset: false` in `inventory/group_vars/all.yml` turns it off.
+The handover is on by default. Adding `gpu_handover_reset: false` to `local.yml` and running `make configure` turns it off.
 
 ## Kubernetes has no such hook
 

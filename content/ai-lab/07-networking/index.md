@@ -4,10 +4,18 @@ date = 2026-10-03
 description = "The networks of a GPU cluster, and what the lab emulates for each: NVLink, InfiniBand, the front end and out-of-band management."
 
 [extra]
+# Series navigation and table of contents are placed in the body (below).
+toc = false
 social_media_card = "card.png"
 # Thumbnail in the post list.
 local_image = "ai-lab/07-networking/card.png"
 +++
+
+<!-- series_intro -->
+
+<h3>Table of contents</h3>
+
+<!-- toc -->
 
 ## Overview
 

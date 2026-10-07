@@ -59,7 +59,7 @@ CARDS = [
          chips=["GPUs", "scheduler", "NVLink", "BMCs"],
          focus=ALL, label="every layer, one dashboard", chart=True),
     dict(file="07-networking", part=7,
-         chips=["InfiniBand topology", "front-end Ethernet", "no RDMA · no DPUs"],
+         chips=["InfiniBand topology · traffic", "front-end Ethernet"],
          focus={IB}, label="scale-out: leaf · spine"),
     dict(file="08-gpu-handover", part=8,
          chips=["nvidia-smi --gpu-reset", "Slurm epilog", "GPU_RESET"],

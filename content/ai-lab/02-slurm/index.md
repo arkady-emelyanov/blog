@@ -4,10 +4,18 @@ date = 2026-09-29
 description = "Running the emulated GB200 cluster with Slurm: GPU scheduling, jobs from srun to PyTorch DDP, drains, quotas and monitoring."
 
 [extra]
+# Series navigation and table of contents are placed in the body (below).
+toc = false
 social_media_card = "card.png"
 # Thumbnail in the post list.
 local_image = "ai-lab/02-slurm/card.png"
 +++
+
+<!-- series_intro -->
+
+<h3>Table of contents</h3>
+
+<!-- toc -->
 
 ## Overview
 
@@ -23,7 +31,7 @@ I'll show how Slurm is configured for GPUs, then run jobs from a one-liner up to
 
 Commands that start with `bin/` run on the host, from the repository root. All other commands run on the login node as `joe`, the lab's regular user from [Part 1](@/ai-lab/01-intro/index.md#first-contact); `bin/ssh login` gets you there.
 
-## What Slurm sees
+## Looking at the cluster
 
 ```console
 $ sinfo
@@ -43,7 +51,14 @@ There is one partition with two nodes, one per tray. Each node has:
 - 7.5 GB of schedulable memory
 - 50 GB of node-local scratch
 
-Slurm treats GPUs as a **generic resource** (GRES), written as `gpu:gb200:4`. Jobs ask for GPUs the same way they ask for CPUs and memory.
+Slurm treats GPUs as a **generic resource** (GRES), written as `gpu:gb200:4`. Jobs ask for GPUs the same way they ask for CPUs and memory. These are the resource lines of `ddp-train.sbatch`, one of the lab's example jobs, which asks for two nodes with four GPUs each:
+
+```bash
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=4
+#SBATCH --cpus-per-task=4
+```
 
 `scontrol show node` gives the full picture, including what's allocated right now:
 
@@ -309,7 +324,7 @@ The panels at the bottom come from the BMCs; [Part 6](@/ai-lab/06-observability/
 
 This dashboard shows allocated versus total GPUs, GPUs per user and jobs by state. In **Jobs by state**, the DDP job is running (blue) and `nvl8-hello` is pending (yellow) until the GPUs free up. The panel is stacked, so the top line at 2 is both jobs together:
 
-{{< figure src="panel-jobs-by-state.png" alt="Jobs by state: one job running, one pending until the GPUs free up" caption="Jobs by state panel" />}}
+{{< figure src="panel-jobs-by-state.png" alt="Jobs by state: one job running, one pending until the GPUs free up" caption="Jobs by state panel during the DDP run" />}}
 
 Draining a node or submitting a job that can't run shows up here too, which makes the lab a convenient place to build alerts. [Part 6](@/ai-lab/06-observability/index.md) walks through both dashboards panel by panel.
 
