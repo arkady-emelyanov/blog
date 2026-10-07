@@ -41,7 +41,7 @@ ALL = {GPUS, SWITCH, LINKS, BMCS}
 
 CARDS = [
     dict(file="01-intro", part=1,
-         chips=["Incus · Ansible", "CUDA · NVML · NCCL", "make up"],
+         chips=["Incus · Ansible", "CUDA · NVML · NCCL", "Slurm · k3s"],
          focus=ALL, label="2 trays · 8 GB200 · 1 switch tray"),
     dict(file="02-slurm", part=2,
          chips=["GRES · cons_tres", "topology/block", "sacct · quotas"],
