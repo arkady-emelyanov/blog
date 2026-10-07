@@ -9,11 +9,13 @@ social_media_card = "card.png"
 local_image = "ai-lab/02-slurm/card.png"
 +++
 
-[Part 1](@/ai-lab/01-intro/index.md) introduced the lab: one NVL8 NVLink domain with two trays of four fake GB200 GPUs, running on a single Linux machine. This post covers the default scheduler, Slurm 23.11. We'll read the cluster's state, look at how it's configured for GPUs, run jobs from a one-liner up to PyTorch DDP across both trays, do some routine operations, and watch all of it in Prometheus.
+[Part 1](@/ai-lab/01-intro/index.md) introduced the lab: one NVL8 NVLink domain with two trays of four emulated GB200 GPUs, running on a single Linux machine. This post covers the default scheduler, Slurm 23.11.
+
+We'll look at how Slurm is configured for GPUs, run jobs from a one-liner up to PyTorch DDP across both trays, do some routine operations, and watch it all in Prometheus.
 
 Commands prefixed with `$` run on the login node as the directory user `joe` (`bin/ssh login`). Commands that start with `bin/` run from the repository root on the host.
 
-## Runtime information
+## What Slurm sees
 
 ```console
 $ sinfo
@@ -26,7 +28,16 @@ sched-worker1 gpu:gb200:4 4 7500 51200 idle
 sched-worker2 gpu:gb200:4 4 7500 51200 idle
 ```
 
-There is one partition with two nodes. Each node has four GPUs of type `gb200`, 4 cores, 7.5 GB of schedulable memory and 50 GB of node-local scratch. `scontrol show node` gives the full picture, including what's allocated right now:
+There is one partition with two nodes, one per tray. Each node has:
+
+- four GPUs of type `gb200`,
+- 4 cores,
+- 7.5 GB of schedulable memory,
+- 50 GB of node-local scratch.
+
+Slurm treats GPUs as a **generic resource** (GRES), written as `gpu:gb200:4`. Jobs ask for GPUs the same way they ask for CPUs and memory.
+
+`scontrol show node` gives the full picture, including what's allocated right now:
 
 ```console
 $ scontrol show node sched-worker1
@@ -40,16 +51,18 @@ NodeName=sched-worker1 Arch=x86_64 CoresPerSocket=4
    AllocTRES=
 ```
 
-Accounting is enforced, so a user without an association can't submit anything. `joe` belongs to the account `lab`:
+`CfgTRES` is what the node offers and `AllocTRES` what jobs hold right now, empty on an idle node. TRES (trackable resources) is the name Slurm uses for anything it counts and accounts for, GPUs included.
+
+Accounting is enforced, so a user without an **association** (the link between a user, an account and a cluster, which limits hang off) can't submit anything. `joe` belongs to the account `lab`:
 
 ```console
 $ sacctmgr -n show assoc user=joe format=cluster,account,user,qos
       nvl8        lab        joe               normal
 ```
 
-## How it's configured
+## How Slurm is configured for GPUs
 
-The configuration is short. These are the lines that matter for GPUs, from `/etc/slurm/slurm.conf` on `sched-control`:
+The configuration is short. These are the lines that matter for GPUs, taken from `/etc/slurm/slurm.conf` on `sched-control`:
 
 ```
 SelectType=select/cons_tres
@@ -73,7 +86,7 @@ NodeName=sched-worker1,sched-worker2 … RealMemory=7500 TmpDisk=51200 Gres=gpu:
   …
   ```
 
-- **`topology/block`** is the setting that matters for NVL-class systems. A block is a set of nodes that share an NVLink partition, and Slurm keeps jobs that fit in one block inside it. Nobody writes `topology.conf` by hand here. NVIDIA's [topograph](https://github.com/dsx-ai-factory/topograph) generates it every minute from the live fabric (more on that in [Part 5](@/ai-lab/05-nvlink/index.md)):
+- **`topology/block`** is about NVLink partitions. An NVLink domain can be split into partitions, and GPUs in different partitions can't reach each other over NVLink. Right after setup, all 8 GPUs are in one partition. `topology/block` keeps a job's nodes in one partition when the job fits, so its GPUs talk over NVLink instead of the slower network. Slurm calls such a group of nodes a block, and reads the blocks from `topology.conf`. NVIDIA's [topograph](https://github.com/dsx-ai-factory/topograph) writes that file every minute from the current NVLink state (more on that in [Part 5](@/ai-lab/05-nvlink/index.md)):
 
   ```console
   $ scontrol show topology
@@ -81,11 +94,11 @@ NodeName=sched-worker1,sched-worker2 … RealMemory=7500 TmpDisk=51200 Gres=gpu:
   ```
 
 - **`AccountingStorageTRES=gres/gpu`** records GPU usage per job, user and account.
-- **`proctrack/linuxproc` and `task/none`** have a lab-specific reason: the trays are unprivileged containers, so Slurm has no cgroups to confine jobs. GPU isolation therefore comes from `CUDA_VISIBLE_DEVICES`, which the fake CUDA driver honours.
+- **`proctrack/linuxproc` and `task/none`** have a lab-specific reason: the trays are unprivileged containers, so Slurm has no cgroups to confine jobs. GPU isolation therefore comes from `CUDA_VISIBLE_DEVICES`, which the emulated CUDA driver honours.
 
-## Simple jobs
+## Running jobs
 
-**Binding.** Ask for 8 tasks with one GPU each and check what every task receives:
+**GPU binding.** Slurm calls assigning specific GPUs to a task *binding* (see the `--gpu-bind` option). It tells each task which GPUs it may use through the `CUDA_VISIBLE_DEVICES` variable. Ask for 8 tasks with one GPU each and print the variable in every task:
 
 ```console
 $ srun -N2 --ntasks-per-node=4 --gpus-per-task=1 bash -c 'echo $(hostname) $CUDA_VISIBLE_DEVICES' | sort
@@ -99,7 +112,9 @@ sched-worker2 2
 sched-worker2 3
 ```
 
-**What CUDA sees.** A job that asks for two GPUs sees two GPUs:
+The four tasks on each tray got GPUs 0, 1, 2 and 3, so no two tasks share a GPU.
+
+**CUDA only sees the GPUs the job asked for.** Ask for two GPUs and count them from PyTorch:
 
 ```console
 $ srun -N1 --gpus-per-node=2 bash -c 'echo CVD=$CUDA_VISIBLE_DEVICES;
@@ -108,9 +123,9 @@ CVD=0,1
 2
 ```
 
-`nvidia-smi` inside the same job still lists all four GPUs on the tray. Real `nvidia-smi` ignores `CUDA_VISIBLE_DEVICES` too, and without cgroup device confinement nothing hides the other device nodes. Keep that in mind if you write tooling that counts GPUs.
+`nvidia-smi` is different: inside the same job it still lists all four GPUs on the tray. Real `nvidia-smi` ignores `CUDA_VISIBLE_DEVICES` too. On a real cluster, Slurm usually hides the other GPUs with cgroups, but the lab's trays are containers without cgroup control, so all four stay visible. Keep that in mind if you write tooling that counts GPUs.
 
-**A batch job across the domain.** The examples from the repository (`bin/scp -r examples login:`) include `nvl8-hello.sbatch`, which runs eight tasks with one GPU each. Every task reports its GPU's UUID and NVLink clique:
+**A batch job across the domain.** The examples from the repository (`bin/scp -r examples login:`) include `nvl8-hello.sbatch`, which runs eight tasks with one GPU each. In a distributed job each task has a number, its **rank**, from 0 to 7 here; ranks are how the tasks address each other. Every task reports its rank, its GPU's UUID and its NVLink clique:
 
 ```console
 $ cd examples/slurm && sbatch --wait nvl8-hello.sbatch
@@ -123,9 +138,9 @@ job 14 on sched-worker[1-2]: 8 tasks
 7: rank 7 on sched-worker2 CUDA_VISIBLE_DEVICES=3: NVIDIA GB200, GPU-814804a5-291e-ba91-a4e9-01fb69ea739b, 1, scratch  198G
 ```
 
-All eight GPUs are in clique `1`, which is the same NVLink partition.
+All eight GPUs are in clique `1`, which is the same NVLink partition, so traffic between any two ranks can stay on NVLink. [Part 5](@/ai-lab/05-nvlink/index.md) splits the domain and shows what Slurm does when a job can't fit in one partition.
 
-**PyTorch DDP on 8 GPUs.** `ddp-train.sbatch` starts one `torchrun` per tray, with four ranks each, NCCL as the backend and rendezvous on the first node. It needs the frameworks venv (`make frameworks`), and extra arguments go straight to the training script:
+**PyTorch DDP on 8 GPUs.** DDP (distributed data parallel) is the most common way to train on several GPUs: every GPU holds a copy of the model, trains on its own slice of the data, and after each step all GPUs average their gradients in an **all-reduce**. On this cluster, the all-reduce runs over NVLink. `ddp-train.sbatch` starts one `torchrun` per tray, with four ranks each, NCCL as the backend and rendezvous on the first node. It needs the frameworks venv (`make frameworks`), and extra arguments go straight to the training script:
 
 ```console
 $ sbatch ddp-train.sbatch --steps 60000
@@ -137,7 +152,7 @@ step 60000      4.4 ms    115881 samples/s      47 TFLOP/s/GPU
 rank 0/8 on sched-worker1 cuda:0 (NVIDIA GB200) peak mem 7.1 GiB
 ```
 
-The step time comes from the simulated cost of the GEMMs and the all-reduce. Change `--width` or `--batch` and it moves roughly the way it would on real hardware. The loss values are meaningless, since nothing is computed.
+The step time is simulated: it's roughly how long the matrix multiplications and the all-reduce would take on GB200s. Change `--width` or `--batch` and it changes about as it would on real hardware. The loss values are not real, because the emulated GPUs don't do the math.
 
 ## Operations
 
@@ -149,7 +164,9 @@ $ sacct -X -o JobID,JobName,User,Account,AllocTRES%45,Elapsed,State
 3            nvl8-hello       joe        lab  billing=8,cpu=8,gres/gpu=8,mem=15000M,node=2   00:00:01  COMPLETED
 ```
 
-**Draining a node for maintenance.** Run these as root on the controller (`bin/ssh sched-control`):
+GPU-hour reports and chargeback are built on this data.
+
+**Draining a node for maintenance.** Draining tells Slurm to let running jobs finish but start no new ones on the node, so you can work on it without killing anyone's job. Run these as root on the controller (`bin/ssh sched-control`):
 
 ```console
 # scontrol update nodename=sched-worker2 state=drain reason="maintenance: BMC firmware"
@@ -166,6 +183,8 @@ $ squeue
 JOBID PARTITION     NAME     USER ST  TIME  NODES NODELIST(REASON)
    17       gpu two-tray      joe PD  0:00      2 (Nodes required for job are DOWN, DRAINED or reserved for jobs in higher priority partitions)
 ```
+
+The partitions in that message are **Slurm partitions**, not NVLink ones. A Slurm partition is a named group of nodes that jobs are submitted to, much like a queue; the lab has one, `gpu`.
 
 `scontrol update nodename=sched-worker2 state=resume` brings the node back, and job 17 runs within seconds. In [Part 4](@/ai-lab/04-bmc-redfish/index.md) we power-cycle a tray through its BMC, which is the other half of this runbook.
 
@@ -185,7 +204,7 @@ The 8-GPU job waits on `AssocGrpGRES` while the 4-GPU job runs. `GrpTRES=gres/gp
 
 ## Monitoring
 
-While the 60,000-step DDP job runs, the tray looks busy:
+Slurm knows which GPUs a job holds, but not whether the job is using them. While the 60,000-step DDP job runs, the tray looks busy:
 
 ```console
 $ bin/ssh sched-worker1 nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw,temperature.gpu --format=csv
@@ -199,7 +218,11 @@ pid, process_name, used_memory [MiB]
 …
 ```
 
-Compare that with the idle numbers from Part 1 (about 140 W, 32 °C, 0 %). Prometheus (`http://10.107.111.10:9090`) scrapes the same values through the GPU exporter, and it also scrapes the Slurm exporter and a small GPU-allocation collector. Recording rules turn these into **scheduler-neutral** `sched_*` series, which the dashboards are built on. With the DDP job running and `nvl8-hello` (job 3) waiting behind it:
+Compare that with the idle numbers from Part 1 (about 140 W, 32 °C, 0 %).
+
+Prometheus (`http://10.107.111.10:9090`) collects the same GPU values through the GPU exporter. It also collects job and node data from the Slurm exporter, and GPU allocations from a small collector. Recording rules combine these into `sched_*` series that look the same whichever scheduler is running, and the dashboards are built on those. In Kubernetes mode, the same series come from Kubernetes instead ([Part 3](@/ai-lab/03-kubernetes/index.md)).
+
+Here are some of them while the DDP job runs, with `nvl8-hello` submitted after it and waiting for free GPUs:
 
 | Query | Value during the job |
 |---|---|
@@ -221,4 +244,4 @@ Draining a node or submitting a job that can't run shows up there too, which mak
 
 ## Next in the series
 
-[Part 3: Kubernetes](@/ai-lab/03-kubernetes/index.md) rebuilds the same hardware with k3s, Kueue and JobSet, and runs the same four jobs as pods.
+[Part 3: Kubernetes](@/ai-lab/03-kubernetes/index.md) rebuilds the same hardware with k3s, Kueue and JobSet, and runs the same jobs as pods.
