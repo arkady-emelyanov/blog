@@ -35,7 +35,7 @@ veth…@if2        UP             …
 eth0@if355       UP             10.107.111.21/24 metric 100 …
 ```
 
-`eth0` carries everything: SSH, the scheduler's control traffic, LDAP, S3 and JuiceFS, Prometheus scrapes, and the BMCs' Redfish. In Kubernetes mode `flannel.1` adds the pod network (a 10.42.x.0/24 per node) as VXLAN over the same `eth0`. That's where the DDP job's rendezvous happens: `torchrun` in pod 1 connects to pod 0 through the JobSet's DNS name ([Part 3](@/ai-lab/03-kubernetes/index.md#simple-jobs)).
+`eth0` carries everything: SSH, the scheduler's control traffic, LDAP, S3 and JuiceFS, Prometheus scrapes, and the BMCs' Redfish. In Kubernetes mode `flannel.1` adds the pod network (a 10.42.x.0/24 per node) as VXLAN over the same `eth0`. That's where the DDP job's rendezvous happens: `torchrun` in pod 1 connects to pod 0 through the JobSet's DNS name ([Part 3](@/ai-lab/03-kubernetes/index.md#running-jobs)).
 
 The rendezvous is a handful of small messages. The training traffic itself, the gradients exchanged in every all-reduce, never touches the Ethernet side (`eth0` and the pod network on top of it). With the 8-GPU DDP job running ([Part 6](@/ai-lab/06-observability/index.md)), Prometheus showed:
 

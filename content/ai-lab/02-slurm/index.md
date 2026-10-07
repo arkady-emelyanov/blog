@@ -13,7 +13,7 @@ local_image = "ai-lab/02-slurm/card.png"
 
 We'll look at how Slurm is configured for GPUs, run jobs from a one-liner up to PyTorch DDP across both trays, do some routine operations, and watch it all in Prometheus.
 
-Commands prefixed with `$` run on the login node as the directory user `joe` (`bin/ssh login`). Commands that start with `bin/` run from the repository root on the host.
+Commands prefixed with `$` run on the login node as `joe`, the lab's regular user from [Part 1](@/ai-lab/01-intro/index.md#first-contact) (`bin/ssh login`). Commands that start with `bin/` run from the repository root on the host.
 
 ## What Slurm sees
 
@@ -131,7 +131,7 @@ CVD=0,1
 
 ### A batch job across the domain
 
-The examples from the repository (`bin/scp -r examples login:`) include `nvl8-hello.sbatch`, which runs eight tasks with one GPU each. In a distributed job each task has a number, its **rank**, from 0 to 7 here; ranks are how the tasks address each other. Every task reports its rank, its GPU's UUID and its NVLink clique:
+The examples from the repository (`bin/scp -r examples login:`) include `nvl8-hello.sbatch`, which runs eight tasks with one GPU each. In a distributed job each task has a number, its **rank**, from 0 to 7 here; ranks are how the tasks address each other. A GPU's **clique** is NVIDIA's ID for the NVLink partition it belongs to: GPUs with the same clique ID can talk to each other over NVLink. Every task reports its rank, its GPU's UUID and its clique:
 
 ```console
 $ cd examples/slurm && sbatch --wait nvl8-hello.sbatch
@@ -275,4 +275,4 @@ Draining a node or submitting a job that can't run shows up here too, which make
 
 ## Next in the series
 
-[Part 3: Kubernetes](@/ai-lab/03-kubernetes/index.md) rebuilds the same hardware with k3s, Kueue and JobSet, and runs the same jobs as pods.
+[Part 3: Kubernetes](@/ai-lab/03-kubernetes/index.md) uses Kubernetes (k3s with Kueue and JobSet) as the scheduler on the same hardware, and runs the same jobs as pods.

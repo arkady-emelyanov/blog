@@ -133,7 +133,7 @@ $ incus list --all-projects -c ns4 -f compact
   sched-worker2-bmc   RUNNING  10.107.111.32 (eth0)
 ```
 
-These map one to one onto the overview picture: the two GPU trays are `sched-worker1` and `sched-worker2`, the switch tray is `sched-nvswitch`, and every tray has its own `-bmc` container. The `bin/` wrappers look the addresses up in Incus, so you never need to type them:
+These map one to one onto the overview picture: the two GPU trays are `sched-worker1` and `sched-worker2`, the switch tray is `sched-nvswitch`, and every tray has its own `-bmc` container. The lab has one regular user, `joe`, an OpenLDAP account that works on every node. The rest of the series uses `joe` for everything a cluster user would do. The `bin/` wrappers look the addresses up in Incus, so you never need to type them:
 
 ```
 bin/ssh login                    # login node as joe (joe's lab key, no password)
