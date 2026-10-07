@@ -88,7 +88,7 @@ Each GPU tray has `/dev/nvidia0-3` and stub versions of NVIDIA's software: the C
 
 The hardware and NVIDIA's software are modelled:
 
-- **CUDA, cuBLAS and cuDNN** report the GPU's properties, manage memory up to the GPU's size (and run out of memory beyond it), and time every operation. GPU kernels never actually execute, and tensors hold zeros.
+- **CUDA, cuBLAS and cuDNN** report the GPU's properties, manage memory up to the GPU's size (and run out of memory beyond it), and time every operation. GPU kernels never actually execute, so a tensor holds whatever its memory had: zeros for a fresh allocation, stale data for a reused one.
 - **NVML and `nvidia-smi`** report the GPU's identity, NVLink state, NVLink partition, NUMA layout and processes, and support GPU reset. Utilisation, power and temperature follow a model of the load, not measured curves.
 - **NCCL** creates communicators and times collectives over NVLink inside a partition and over InfiniBand across partitions. No data is exchanged, so a dead peer or a broken link doesn't make a collective fail as it would on real hardware.
 - **NVLink and NVSwitch** have 18 links per GPU to two 72-port switches, partitions that take effect at GPU reset, links that can be disabled, and fabric telemetry. There is a single NVL8 domain, enough to exercise every interface but not to study a large cluster.
