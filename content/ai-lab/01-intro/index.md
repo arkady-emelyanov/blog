@@ -57,7 +57,7 @@ GPU2	NV18	NV18	X	NV18	0-3	0		N/A
 GPU3	NV18	NV18	NV18	X	0-3	0		N/A
 ```
 
-`NV18` means the two GPUs are connected through 18 NVLinks. The matrix reflects the lab's current state, so changes made through other interfaces show up in it. If you disable two of a GPU's NVLinks through the BMC, `NV18` turns into `NV16` for that GPU. If you move a tray into its own NVLink partition, Slurm's block topology or Kubernetes' node labels change within a minute. Parts 4 and 5 are built around that feedback loop.
+`NV18` means the two GPUs reach each other over 18 NVLinks. Each GB200 GPU has 18 NVLinks ([NVIDIA's NVLink specifications](https://www.nvidia.com/en-us/data-center/nvlink/)). They don't connect GPUs directly: all 18 go to the NVSwitch chips on the switch tray, and the switches connect every GPU to every other. So any two GPUs can use all 18 links to talk to each other. The matrix reflects the lab's current state, so changes made through other interfaces show up in it. If you disable two of a GPU's NVLinks through the BMC, `NV18` turns into `NV16` for that GPU. If you move a tray into its own NVLink partition, Slurm's block topology or Kubernetes' node labels change within a minute. Parts 4 and 5 are built around that feedback loop.
 
 ## What you can practise
 
@@ -138,7 +138,7 @@ These map one to one onto the overview picture: the two GPU trays are `sched-wor
 ```
 bin/ssh login                    # login node as joe (joe's lab key, no password)
 bin/ssh root@sched-worker1       # any instance as root, with the generated admin key
-bin/redfish sched-worker1 /redfish/v1/Systems/System_0
+bin/redfish sched-worker1 /redfish/v1/Systems/System_0   # a tray's BMC over Redfish (Part 4)
 ```
 
 A tray looks like any other GPU node:

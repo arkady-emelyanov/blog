@@ -9,11 +9,11 @@ social_media_card = "card.png"
 local_image = "ai-lab/04-bmc-redfish/card.png"
 +++
 
-Parts [2](@/ai-lab/02-slurm/index.md) and [3](@/ai-lab/03-kubernetes/index.md) used the cluster the way its users do, through a scheduler. This part covers the operator's back door: the baseboard management controllers. We'll walk the Redfish tree, break NVLinks on purpose, power-cycle a tray, and see what the scheduler makes of it. The examples run in Slurm mode, but the BMCs are identical with Kubernetes.
+Parts [2](@/ai-lab/02-slurm/index.md) and [3](@/ai-lab/03-kubernetes/index.md) used the cluster the way its users do, through a scheduler. A scheduler only knows what each tray's operating system reports, so a hung or powered-off tray can look healthy to it for minutes. This part covers the operator's back door: the baseboard management controllers (BMCs), which manage the hardware independently of the OS. We'll walk the Redfish tree, break NVLinks on purpose, and power-cycle a tray. The examples run in Slurm mode, but the BMCs are identical with Kubernetes. Commands that start with `bin/` run on the host from the repository root.
 
 ## BMCs and Redfish in two paragraphs
 
-A **BMC** is a small computer on every server board with its own network port. It stays up when the host is off or hung, and it can power the host on and off, report hardware inventory and health, and change firmware-level settings. In a GB200 rack every compute tray and every NVLink switch tray has one.
+A **BMC** is a small computer on every server board with its own network port and its own power. Dell's iDRAC and HPE's iLO are BMCs. It stays up when the host is off or hung, and it can power the host on and off, report hardware inventory and health, and change firmware-level settings. In a GB200 rack every compute tray and every NVLink switch tray has one. A compute tray actually has two controllers: the tray's BMC, and the HGX Management Controller (HMC) on the GPU board, which looks after the GPUs. You only talk to the BMC, and it passes on what the HMC reports about the GPUs.
 
 **Redfish** is the DMTF's REST/JSON API for BMCs, and it replaced IPMI. Everything is a resource under `/redfish/v1`: you read with `GET`, change settings with `PATCH`, and trigger actions with `POST`. Vendors add their own fields under `Oem`. NVIDIA's GB200 BMCs run a fork of OpenBMC's `bmcweb`, and the lab's `fakebmc` is modelled on it, `Oem.Nvidia` fields included.
 
@@ -24,34 +24,69 @@ The lab has three BMCs:
 | `sched-worker1-bmc`, `sched-worker2-bmc` | .31, .32 | a GPU tray: power, 4 GPUs, 18 NVLink ports each |
 | `sched-nvswitch-bmc` | .33 | the switch tray: 2 NVSwitch chips × 72 ports |
 
-The credentials are OpenBMC's defaults, `root` / `0penBmc`, and the certificates are self-signed. `bin/redfish <tray> <path> [curl args]` wraps `curl -k` with the credentials filled in.
+The credentials are OpenBMC's defaults, `root` / `0penBmc`, and the certificates are self-signed.
 
-## Observation
+## Reading a tray through its BMC
 
-The service root is the one resource you can read without logging in:
+The service root is the one resource you can read without logging in. It links to everything else:
 
 ```console
 $ curl -sk https://10.107.111.31/redfish/v1 | jq -c '{RedfishVersion, Systems, Chassis, Managers}'
 {"RedfishVersion":"1.17.0","Systems":{"@odata.id":"/redfish/v1/Systems"},"Chassis":{"@odata.id":"/redfish/v1/Chassis"},"Managers":{"@odata.id":"/redfish/v1/Managers"}}
 ```
 
-The usual three branches are there. *Systems* is what runs (host, CPUs, GPUs). *Chassis* is the physical enclosure. *Managers* is the BMC itself.
+The usual three branches are there. *Systems* is what runs, *Chassis* is the physical hardware, and *Managers* are the controllers themselves.
+
+Everything below the service root needs the credentials. The repository's `bin/redfish` helper takes a tray name and a path, looks up the tray's BMC address in Incus, and runs `curl -k` with the credentials filled in. Any extra arguments go to `curl`. The rest of this part uses it.
+
+A GB200 compute tray has two systems:
 
 ```console
-$ bin/redfish sched-worker1 /redfish/v1/Systems/System_0 | jq '{PowerState, Status, ProcessorSummary}'
-{
-  "PowerState": "On",
-  "Status": { "Health": "OK", "State": "Enabled" },
-  "ProcessorSummary": { "Count": 4 }
-}
-$ bin/redfish sched-worker1 /redfish/v1/Chassis/Chassis_0 | jq -c '{ChassisType, Model, PowerState}'
-{"ChassisType":"Sled","Model":"NVIDIA GB200 compute tray","PowerState":"On"}
+$ bin/redfish sched-worker1 /redfish/v1/Systems | jq -r '.Members[]."@odata.id"'
+/redfish/v1/Systems/System_0
+/redfish/v1/Systems/HGX_Baseboard_0
 ```
 
-In the lab, the GPUs are processors of `System_0`. The BMC's UUID matches the one `nvidia-smi` reports inside the tray, so inventory tooling can join out-of-band and in-band data on it:
+`System_0` is the tray's host, the Grace CPU running the OS. Power and reset live there. `HGX_Baseboard_0` is the GPU board, with the four GPUs as its processors:
 
 ```console
-$ bin/redfish sched-worker1 /redfish/v1/Systems/System_0/Processors/GPU_0 | jq '{Model, UUID, SerialNumber, Oem}'
+$ bin/redfish sched-worker1 /redfish/v1/Systems/System_0 | jq '{PowerState, Status}'
+{
+  "PowerState": "On",
+  "Status": {
+    "Health": "OK",
+    "State": "Enabled"
+  }
+}
+
+$ bin/redfish sched-worker1 /redfish/v1/Systems/HGX_Baseboard_0 | jq '{PowerState, Status, ProcessorSummary}'
+{
+  "PowerState": "On",
+  "Status": {
+    "Health": "OK",
+    "State": "Enabled"
+  },
+  "ProcessorSummary": {
+    "Count": 4
+  }
+}
+```
+
+The two controllers show up as two managers: `BMC_0` for the tray and `HGX_BMC_0` for the HMC.
+
+```console
+$ bin/redfish sched-worker1 /redfish/v1/Managers | jq -r '.Members[]."@odata.id"'
+/redfish/v1/Managers/BMC_0
+/redfish/v1/Managers/HGX_BMC_0
+
+$ bin/redfish sched-worker1 /redfish/v1/Chassis/Chassis_0 | jq -c '{ChassisType, Model, PowerState}'
+{"ChassisType":"RackMount","Model":"GB200 NVL","PowerState":"On"}
+```
+
+Each GPU's UUID on the BMC matches the one `nvidia-smi` reports inside the tray, so inventory tooling can join out-of-band and in-band data on it:
+
+```console
+$ bin/redfish sched-worker1 /redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_0 | jq '{Model, UUID, SerialNumber, Oem}'
 {
   "Model": "NVIDIA GB200",
   "UUID": "81501924-f170-f6d0-f2da-dc7595876881",
@@ -59,66 +94,68 @@ $ bin/redfish sched-worker1 /redfish/v1/Systems/System_0/Processors/GPU_0 | jq '
   "Oem": {
     "Nvidia": {
       "@odata.type": "#NvidiaProcessor.v1_4_0.NvidiaGPU",
-      "FabricClique": { "CliqueId": 1, "ClusterUUID": "7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91" },
+      "FabricClique": {
+        "CliqueId": 1,
+        "ClusterUUID": "7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91"
+      },
       "PCIeBusId": "00000000:18:00.0"
     }
   }
 }
+
 $ bin/ssh sched-worker1 nvidia-smi -L | head -1
 GPU 0: NVIDIA GB200 (UUID: GPU-81501924-f170-f6d0-f2da-dc7595876881)
 ```
 
-> **Don't hard-code these paths.** The lab uses a simplified layout. On real GB200 compute-tray BMCs the GPUs sit behind the HMC under `/redfish/v1/Systems/HGX_Baseboard_0/Processors`, with an `HGX_GPU_<n>` chassis per GPU and an `HGX_BMC_0` manager. On the switch tray, the fabric is `MGX_NVLinkFabric_0` (the lab's is `NVLinkFabric_0`) and the switches have `MGX_NVSwitch_<n>` chassis. `make test-bmc-conformance` checks for the real layout and fails on every difference:
->
-> ```
-> FAILED tests/bmc/test_conformance.py::test_gpus_live_under_the_hgx_baseboard[sched-worker1]
-> FAILED tests/bmc/test_conformance.py::test_gpus_live_under_the_hgx_baseboard[sched-worker2]
-> FAILED tests/bmc/test_conformance.py::test_each_gpu_has_a_chassis_with_its_uuid[sched-worker1]
-> FAILED tests/bmc/test_conformance.py::test_each_gpu_has_a_chassis_with_its_uuid[sched-worker2]
-> FAILED tests/bmc/test_conformance.py::test_tray_has_host_bmc_and_hmc_managers[sched-worker1]
-> FAILED tests/bmc/test_conformance.py::test_tray_has_host_bmc_and_hmc_managers[sched-worker2]
-> FAILED tests/bmc/test_conformance.py::test_switch_tray_identifies_as_nvswitch
-> FAILED tests/bmc/test_conformance.py::test_switch_fabric_name - AssertionErro...
-> ```
->
-> Discover resources by following `Members` links from the collections instead of building paths, and your tooling will work against both.
-
-Each GPU has 18 NVLink ports, and each port has a pending-settings object (`@Redfish.Settings`). That's the standard Redfish pattern for changes that only take effect at the next reset:
+The GPUs also appear under *Chassis*, one `HGX_GPU_<n>` chassis per GPU, with the same UUID:
 
 ```console
-$ bin/redfish sched-worker1 /redfish/v1/Systems/System_0/Processors/GPU_2/Ports/NVLink_3 \
+$ bin/redfish sched-worker1 /redfish/v1/Chassis/HGX_GPU_0 | jq -c '{ChassisType, Model, UUID}'
+{"ChassisType":"Component","Model":"NVIDIA GB200","UUID":"81501924-f170-f6d0-f2da-dc7595876881"}
+```
+
+The NVLinks are listed under each GPU processor, one port for each of the GPU's 18 NVLinks. A port has a pending-settings object (`@Redfish.Settings`). As with BIOS settings, a change is staged there and takes effect at the next reset:
+
+```console
+$ bin/redfish sched-worker1 /redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Ports/NVLink_3 \
     | jq -c '{LinkState, LinkStatus, CurrentSpeedGbps, Settings: ."@Redfish.Settings".SettingsObject}'
-{"LinkState":"Enabled","LinkStatus":"LinkUp","CurrentSpeedGbps":200,"Settings":{"@odata.id":"/redfish/v1/Systems/System_0/Processors/GPU_2/Ports/NVLink_3/Settings"}}
+{"LinkState":"Enabled","LinkStatus":"LinkUp","CurrentSpeedGbps":200,"Settings":{"@odata.id":"/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Ports/NVLink_3/Settings"}}
 ```
 
 The switch tray BMC describes the other end of the cable. Every switch port knows which tray, GPU and link it's connected to:
 
 ```console
-$ bin/redfish sched-nvswitch /redfish/v1/Fabrics/NVLinkFabric_0/Switches/NVSwitch_0/Ports/NVLink_19 \
+$ bin/redfish sched-nvswitch /redfish/v1/Fabrics/MGX_NVLinkFabric_0/Switches/NVSwitch_0/Ports/NVLink_19 \
     | jq -c '{LinkStatus, RemoteEndpoint: .Oem.Nvidia.RemoteEndpoint}'
 {"LinkStatus":"LinkUp","RemoteEndpoint":{"BMC":"sched-worker1-bmc","GPU":"GPU_2","GPUUUID":"81502f39-9cad-de97-2723-3d7d71928458","Host":"sched-worker1","Port":"NVLink_2"}}
 ```
 
-The tray BMCs also carry **GPU sensors**, which is how a BMC reports temperature and power when the host OS can't. On a real tray the BMC reads them from the GPUs over its own sideband bus. In the lab the BMC reads the same GPU state NVML does and applies the same model, so the two agree. Captured during a training run:
+The tray BMCs also report **GPU temperature and power**, even when the host OS is down. Each GPU's sensors are on its `HGX_GPU_<n>` chassis, and `Chassis_0` has the total power for the tray. A real BMC reads these values straight from the GPUs, without going through the host. The lab's BMC computes them the same way NVML does, so both show the same numbers. These readings were taken during a training run:
 
 ```console
-$ bin/redfish sched-worker1 /redfish/v1/Chassis/Chassis_0/Sensors | jq -r '.Members[]."@odata.id"'
-/redfish/v1/Chassis/Chassis_0/Sensors/GPU_0_TEMP_0
-/redfish/v1/Chassis/Chassis_0/Sensors/GPU_0_Power_0
-…
-/redfish/v1/Chassis/Chassis_0/Sensors/Total_GPU_Power_0
+$ bin/redfish sched-worker1 /redfish/v1/Chassis/HGX_GPU_0/Sensors | jq -r '.Members[]."@odata.id"'
+/redfish/v1/Chassis/HGX_GPU_0/Sensors/HGX_GPU_0_TEMP_0
+/redfish/v1/Chassis/HGX_GPU_0/Sensors/HGX_GPU_0_Power_0
 
-$ bin/redfish sched-worker1 /redfish/v1/Systems/System_0/Processors/GPU_0/EnvironmentMetrics \
+$ bin/redfish sched-worker1 /redfish/v1/Chassis/HGX_GPU_0/EnvironmentMetrics \
     | jq -c '{Temp: .TemperatureCelsius.Reading, Power: .PowerWatts.Reading}'
-{"Temp":69,"Power":889.878}
+{"Temp":69,"Power":870.639}
+
 $ bin/ssh sched-worker1 nvidia-smi -i 0 --query-gpu=temperature.gpu,power.draw --format=csv
 temperature.gpu, power.draw [W]
-69, 870.59 W
+69, 892.33 W
+
+$ bin/redfish sched-worker1 /redfish/v1/Chassis/Chassis_0/Sensors/Total_GPU_Power_0 | jq -c '{Reading, ReadingUnits}'
+{"Reading":3541.377,"ReadingUnits":"W"}
 ```
 
-The temperature matches exactly. The power readings differ by about 20 W because the two commands ran a moment apart and a busy GPU's power jitters from sample to sample (a minute earlier, one `nvidia-smi` call read the same tray's four GPUs at 865–889 W). `Total_GPU_Power_0` sums the tray's four GPUs (3557.758 W at that moment). A Redfish exporter polls these sensors and the power state into Prometheus; [Part 6](@/ai-lab/06-observability/index.md) shows what that looks like during a power cycle.
+The temperatures match. The power differs by about 20 W because the two commands ran a moment apart, and a busy GPU's power changes from second to second. `Total_GPU_Power_0` is the sum for all four GPUs.
+
+Prometheus collects these sensors too, through a Redfish exporter. [Part 6](@/ai-lab/06-observability/index.md) shows them during a power cycle.
 
 ## Operations
+
+This section changes the hardware through the BMCs: disabling NVLinks on a GPU tray, taking a port down on the switch tray, and powering a tray off and on.
 
 ### Disable NVLinks and reset the tray
 
@@ -126,9 +163,10 @@ Stage two links of GPU 2 as disabled. The live port is unchanged until the reset
 
 ```console
 $ for l in 3 4; do
-    bin/redfish sched-worker1 /redfish/v1/Systems/System_0/Processors/GPU_2/Ports/NVLink_$l/Settings \
+    bin/redfish sched-worker1 /redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Ports/NVLink_$l/Settings \
       -X PATCH -d '{"LinkState": "Disabled"}'
   done
+
 $ bin/redfish sched-worker1 …/GPU_2/Ports/NVLink_3 | jq -c '{LinkState, LinkStatus}'
 {"LinkState":"Enabled","LinkStatus":"LinkUp"}
 
@@ -136,7 +174,7 @@ $ bin/redfish sched-worker1 /redfish/v1/Systems/System_0/Actions/ComputerSystem.
     -X POST -d '{"ResetType": "ForceRestart"}'
 ```
 
-About 20 seconds later the tray is back up, and both the BMC and the GPU's own view agree:
+When the tray is back up, the BMC and the GPU's own view agree. GPU 2 now has 16 links to each peer instead of 18:
 
 ```console
 $ bin/redfish sched-worker1 …/GPU_2/Ports/NVLink_3 | jq -c '{LinkState, LinkStatus, Status}'
@@ -151,80 +189,83 @@ GPU3	NV18	NV18	NV16	X	0-3	0		N/A
 …
 ```
 
-Slurm didn't notice anything. The tray restarted well within `SlurmdTimeout` (300 s), so it stayed `idle` throughout. On real hardware you'd drain first, and the lab lets you find out what happens when somebody doesn't. Set the links back to `"Enabled"` and reset again to restore `NV18`.
+To undo the change, set both links back to `"Enabled"` and reset the tray again. `nvidia-smi topo -m` then shows `NV18` everywhere.
 
 ### Take a switch port down
 
-Switch-side changes apply immediately, with no reset. Port 19 on `NVSwitch_0` is GPU 2's link 2:
+Each NVLink connects a GPU port to an NVSwitch port. The switch tray's BMC controls the switch end, and changes there apply immediately, with no reset. Port 19 on `NVSwitch_0` is GPU 2's link 2:
 
 ```console
-$ bin/redfish sched-nvswitch /redfish/v1/Fabrics/NVLinkFabric_0/Switches/NVSwitch_0/Ports/NVLink_19 \
+$ bin/redfish sched-nvswitch /redfish/v1/Fabrics/MGX_NVLinkFabric_0/Switches/NVSwitch_0/Ports/NVLink_19 \
     -X PATCH -d '{"LinkState": "Disabled"}'
+
 $ bin/ssh sched-worker1 'nvidia-smi topo -m | grep ^GPU2; nvidia-smi nvlink -s -i 2 | grep "Link 2:"'
 GPU2	NV17	NV17	X	NV17	0-3	0		N/A
 	 Link 2: <inactive>
 ```
 
-One emulation gap shows up here: the tray BMC still reports its end of that link as `LinkUp`. On real hardware, a link that's down is down at both ends, so the GPU's port would report `LinkDown` too. The lab's `fakebmc` doesn't propagate switch-side changes to the tray BMC, and the conformance tier catches it:
+A link that's down is down at both ends, so the tray BMC reports the GPU's port as `LinkDown` too. Its `LinkState` stays `Enabled`, because nothing was changed on the GPU side:
 
+```console
+$ bin/redfish sched-worker1 /redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Ports/NVLink_2 | jq -c '{LinkState, LinkStatus}'
+{"LinkState":"Enabled","LinkStatus":"LinkDown"}
 ```
-E   AssertionError: assert 'LinkUp' == 'LinkDown'
-FAILED tests/bmc/test_conformance.py::test_link_down_shows_at_both_ends - Ass...
-```
 
-For link state from the switch side, trust the switch BMC or NVML in the lab, not the tray BMC.
+On real hardware, a job using that link would now fail. The lab's emulated NCCL never fails, so jobs carry on; it's the one known difference from real hardware that `make test-bmc-conformance` reports. Set the port back to `"Enabled"` to restore the link.
 
-### Power off without draining (what not to do)
+### Power a tray off and on
 
 ```console
 $ bin/redfish sched-worker2 /redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset \
     -X POST -d '{"ResetType": "ForceOff"}'
+
 $ bin/redfish sched-worker2 /redfish/v1/Systems/System_0 | jq -c '{PowerState}'
 {"PowerState":"Off"}
-$ sinfo -N -o "%N %T"
-NODELIST STATE
-sched-worker1 idle
-sched-worker2 idle
 ```
 
-The tray is off, but Slurm still sees it as `idle`. Prometheus is quicker: `up{job="gpu", instance="sched-worker2:9835"}` drops to `0` within seconds. A two-tray job submitted now gets placed on the dead node and fails:
+The tray is off, but its BMC still answers. That's the point of a BMC: it's the one way to reach a tray whose OS is gone. Prometheus notices the tray is gone within seconds: `up{job="gpu", instance="sched-worker2:9835"}` drops to `0`. `"ResetType": "On"` powers the tray back on.
+
+### Using Redfish sessions
+
+So far every request sent the password. Scripts that talk to a BMC for a while should log in once and use a session token instead.
+
+Log in by posting the credentials to the session collection. The BMC answers with the token in the `X-Auth-Token` header, and the session's own address in `Location`:
 
 ```console
-$ sbatch -J blind -N2 --gpus-per-node=4 --wrap "srun hostname"
-Submitted batch job 20
-$ sacct -X -n -j 20 -o JobID,JobName,State
-20                blind     FAILED
+$ curl -sk -D - -o /dev/null -X POST https://10.107.111.32/redfish/v1/SessionService/Sessions \
+    -H 'Content-Type: application/json' -d '{"UserName":"root","Password":"0penBmc"}' \
+    | grep -iE '^(HTTP|x-auth-token|location)'
+HTTP/2 201
+location: /redfish/v1/SessionService/Sessions/93694e3cef
+x-auth-token: 3c4c9f1d0a424028a33f658dff623032
 ```
 
-Within a minute topograph also drops the unreachable tray from `topology.conf` (`BlockName=block001 Nodes=sched-worker1`). `ResetType: On` brings it back, and both the node and the block recover on their own.
+Send the token with every request instead of the password:
 
-### The proper power cycle, with a Redfish session
-
-Automation should use a session token rather than sending the password on every request. You `POST` credentials once, get back `X-Auth-Token`, and `DELETE` the session when you're done:
-
-```bash
-BMC=https://10.107.111.32
-TOKEN=$(curl -sk -D - -o /dev/null -X POST $BMC/redfish/v1/SessionService/Sessions \
-  -H 'Content-Type: application/json' -d '{"UserName":"root","Password":"0penBmc"}' \
-  | awk -F': ' 'tolower($1)=="x-auth-token"{print $2}' | tr -d '\r')
-rf() { curl -sk -H "X-Auth-Token: $TOKEN" -H 'Content-Type: application/json' "$@"; }
-
-bin/ssh sched-control 'scontrol update nodename=sched-worker2 state=drain reason="power cycle"'
-rf -X POST $BMC/redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset -d '{"ResetType":"GracefulShutdown"}'
-until [ "$(rf $BMC/redfish/v1/Systems/System_0 | jq -r .PowerState)" = Off ]; do sleep 2; done
-rf -X POST $BMC/redfish/v1/Systems/System_0/Actions/ComputerSystem.Reset -d '{"ResetType":"On"}'
-until bin/ssh sched-worker2 systemctl is-active slurmd 2>/dev/null | grep -qx active; do sleep 3; done
-bin/ssh sched-control 'scontrol update nodename=sched-worker2 state=resume'
+```console
+$ curl -sk -H "X-Auth-Token: 3c4c9f1d0a424028a33f658dff623032" \
+    https://10.107.111.32/redfish/v1/Systems/System_0 | jq -c '{PowerState}'
+{"PowerState":"On"}
 ```
 
-I ran exactly this script against the lab. The node goes `drained` → `idle*` (resumed, waiting for slurmd to check in) → `idle` within about 20 seconds. Finish by deleting the session (`rf -X DELETE $BMC/redfish/v1/SessionService/Sessions/<id>`). The Kubernetes version swaps `drain`/`resume` for `kubectl cordon`/`uncordon` and is covered in [Part 3](@/ai-lab/03-kubernetes/index.md).
+Log out by deleting the session. After that, the token no longer works (`401`):
+
+```console
+$ curl -sk -o /dev/null -w '%{http_code}\n' -X DELETE -H "X-Auth-Token: 3c4c9f1d0a424028a33f658dff623032" \
+    https://10.107.111.32/redfish/v1/SessionService/Sessions/93694e3cef
+204
+
+$ curl -sk -o /dev/null -w '%{http_code}\n' -H "X-Auth-Token: 3c4c9f1d0a424028a33f658dff623032" \
+    https://10.107.111.32/redfish/v1/Systems/System_0
+401
+```
 
 ## What to build against it
 
 - A **Redfish inventory collector** that joins BMC GPU UUIDs with `nvidia-smi` and the scheduler's node list.
 - A **link-health check** that cross-checks the tray BMC, the switch BMC and NVML, so that a stale reading or a partial failure seen by only one source doesn't go unnoticed.
 - A **maintenance runbook as code** (drain → power cycle → verify → resume) with the failure paths tested: what if the tray never comes back?
-- Redfish client libraries: `make test-bmc` in the repo runs the lab's own pytest suite, and `make test-bmc-conformance` lists where `fakebmc` differs from real GB200 BMCs.
+- Redfish client libraries: the lab's BMCs follow NVIDIA's GB200 layout, and `make test-bmc` in the repo runs the lab's own pytest suite against them.
 
 ## Next in the series
 

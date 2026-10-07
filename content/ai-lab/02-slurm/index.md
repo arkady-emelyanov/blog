@@ -131,11 +131,18 @@ CVD=0,1
 
 ### A batch job across the domain
 
-The examples from the repository (`bin/scp -r examples login:`) include `nvl8-hello.sbatch`, which runs eight tasks with one GPU each. In a distributed job each task has a number, its **rank**, from 0 to 7 here; ranks are how the tasks address each other. A GPU's **clique** is NVIDIA's ID for the NVLink partition it belongs to: GPUs with the same clique ID can talk to each other over NVLink. Every task reports its rank, its GPU's UUID and its clique:
+The repository has example jobs in `examples/`. Copy them to `joe`'s home on the login node with `bin/scp`, which works like `scp` with the lab's addresses and keys filled in:
+
+```
+bin/scp -r examples login:
+```
+
+The Slurm examples include `nvl8-hello.sbatch`, which runs eight tasks with one GPU each. In a distributed job each task has a number, its **rank**, from 0 to 7 here; ranks are how the tasks address each other. A GPU's **clique** is NVIDIA's ID for the NVLink partition it belongs to: GPUs with the same clique ID can talk to each other over NVLink. Every task reports its rank, its GPU's UUID and its clique:
 
 ```console
 $ cd examples/slurm && sbatch --wait nvl8-hello.sbatch
 Submitted batch job 14
+
 $ cat nvl8-hello-14.out
 job 14 on sched-worker[1-2]: 8 tasks
 0: rank 0 on sched-worker1 CUDA_VISIBLE_DEVICES=0: NVIDIA GB200, GPU-81501924-f170-f6d0-f2da-dc7595876881, 1, scratch  198G
@@ -153,6 +160,7 @@ DDP (distributed data parallel) is the most common way to train on several GPUs:
 ```console
 $ sbatch ddp-train.sbatch --steps 60000
 Submitted batch job 2
+
 $ grep -E "^step +(10|50|60000) |rank 0/" ddp-train-2.out
 step   10      4.2 ms    120783 samples/s      49 TFLOP/s/GPU
 step   50      4.4 ms    115140 samples/s      46 TFLOP/s/GPU
@@ -184,6 +192,7 @@ Draining tells Slurm to let running jobs finish but start no new ones on the nod
 
 ```console
 # scontrol update nodename=sched-worker2 state=drain reason="maintenance: BMC firmware"
+
 # sinfo -R
 REASON               USER      TIMESTAMP           NODELIST
 maintenance: BMC fir root      2026-10-05T19:31:07 sched-worker2
@@ -193,6 +202,7 @@ A job that needs both trays now waits, and Slurm says why:
 
 ```console
 $ sbatch -J two-trays -N2 --gpus-per-node=4 --wrap "nvidia-smi -L"
+
 $ squeue
 JOBID PARTITION     NAME     USER ST  TIME  NODES NODELIST(REASON)
    17       gpu two-tray      joe PD  0:00      2 (Nodes required for job are DOWN, DRAINED or reserved for jobs in higher priority partitions)
@@ -208,8 +218,11 @@ Limits live on associations. Cap `joe` at four GPUs:
 
 ```console
 # sacctmgr -i modify user joe set GrpTRES=gres/gpu=4
+
 $ sbatch -J big -N2 --gpus-per-node=4 --wrap "sleep 5"
+
 $ sbatch -J small -N1 --gpus-per-node=4 --wrap "sleep 5"
+
 $ squeue -o "%.5i %.8j %.2t %.20R"
 JOBID     NAME ST     NODELIST(REASON)
    18      big PD       (AssocGrpGRES)
@@ -228,6 +241,7 @@ index, utilization.gpu [%], memory.used [MiB], power.draw [W], temperature.gpu
 0, 79 %, 7850 MiB, 813.26 W, 67
 1, 81 %, 7850 MiB, 850.17 W, 68
 …
+
 $ bin/ssh sched-worker1 nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 pid, process_name, used_memory [MiB]
 10404, /shared/venv/bin/python, 7338 MiB

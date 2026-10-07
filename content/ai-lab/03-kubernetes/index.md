@@ -13,7 +13,7 @@ local_image = "ai-lab/03-kubernetes/card.png"
 
 Slurm handles GPU allocation, topology and queueing itself. Kubernetes wasn't designed for batch GPU work, so these are handled by several add-ons. The most important one is [Kueue](https://github.com/kubernetes-sigs/kueue), which adds job queues and GPU quotas to Kubernetes. We'll look at which add-on does what, how GPUs and NVLink topology show up as Kubernetes objects, run the same jobs as pods, and see how Kueue queues them.
 
-To switch, set `scheduler: k3s` in `inventory/group_vars/all.yml`, then run `make down && make up` ([Part 1](@/ai-lab/01-intro/index.md#setup)). Commands prefixed with `$` run on the login node as `joe` (`bin/ssh login`), whose kubeconfig and namespace are already set up. `bin/kubectl` on the host is cluster admin.
+To switch, set `scheduler: k3s` in `inventory/group_vars/all.yml`, then run `make down && make up` ([Part 1](@/ai-lab/01-intro/index.md#setup)). Commands prefixed with `$` run on the login node as `joe` (`bin/ssh login`), whose kubeconfig and namespace are already set up. `bin/kubectl` runs `kubectl` from the repository root on the host with the cluster-admin kubeconfig; commands that need admin rights use it.
 
 ## What Kubernetes sees
 
@@ -45,6 +45,7 @@ Kubernetes has no job queue of its own: the scheduler places each pod as soon as
 $ kubectl get clusterqueues
 NAME   COHORT   PENDING WORKLOADS
 gpu             0
+
 $ kubectl get localqueues
 NAME      CLUSTERQUEUE   PENDING WORKLOADS   ADMITTED WORKLOADS
 default   gpu            0                   0
@@ -56,6 +57,7 @@ In Kubernetes, `joe` gets a namespace of their own, also called `joe`. Their kub
 ```console
 $ kubectl auth can-i create jobsets.jobset.x-k8s.io
 yes
+
 $ kubectl auth can-i create pods -n kube-system
 no
 ```
@@ -112,6 +114,7 @@ spec:
 
 ```console
 $ kubectl apply -f gpu-pod.yaml
+
 $ kubectl logs gpu-pod
 GPU 0: NVIDIA GB200 (UUID: GPU-8150a4ae-478e-5534-f66c-621a95f85f59)
 GPU 1: NVIDIA GB200 (UUID: GPU-81502f39-9cad-de97-2723-3d7d71928458)
@@ -134,8 +137,10 @@ The repository's `examples/kubernetes/` has four example jobs, written as JobSet
 
 ```console
 $ cd examples/kubernetes
+
 $ ./submit --wait nvl8-hello.yaml
 nvl8-hello-000472
+
 $ cat nvl8-hello-000472.out
 [pod/nvl8-hello-000472-rank-0-0-2bncb/hello] rank 0 on sched-worker1 NVIDIA_VISIBLE_DEVICES=GPU-8150a4ae-…: NVIDIA GB200, GPU-8150a4ae-478e-5534-f66c-621a95f85f59, 1
 …
@@ -147,6 +152,7 @@ That's eight pods, each holding one different GPU, all in clique 1. DDP works th
 ```console
 $ ./submit --wait ddp-train.yaml
 ddp-train-386106
+
 $ grep -E "world=|step +50|rank 0/" ddp-train-386106.out
 [pod/ddp-train-386106-node-0-0-t9m8f/torchrun] world=8 params=537M batch/rank=64 width=8192
 [pod/ddp-train-386106-node-0-0-t9m8f/torchrun] step   50      4.3 ms    119008 samples/s      48 TFLOP/s/GPU
@@ -168,6 +174,7 @@ $ kubectl get workloads
 NAME                               QUEUE   RESERVED IN   ADMITTED   FINISHED   AGE
 jobset-ddp-long-408229-28e60       gpu     gpu           True                  26s
 jobset-nvl8-hello-912542-a34fa     gpu                   False                 21s
+
 $ kubectl get workload jobset-nvl8-hello-912542-a34fa \
     -o jsonpath='{.status.conditions[?(@.type=="QuotaReserved")].message}'
 couldn't assign flavors to pod set rank: insufficient unused quota for nvidia.com/gpu in flavor gb200, 8 more needed
@@ -181,8 +188,10 @@ Cordoning marks a node unschedulable while leaving its running pods alone, the K
 
 ```console
 $ bin/kubectl cordon sched-worker2
+
 $ ./submit nvl8-hello.yaml
 nvl8-hello-664894
+
 $ kubectl get workload … -o jsonpath='{.status.conditions[?(@.type=="QuotaReserved")].message}'
 couldn't assign flavors to pod set rank: topology "nvl" allows to fit only 4 out of 8 pod(s)
 ```
@@ -212,9 +221,11 @@ The pods' GPU work is visible on the trays as it would be for any process. This 
 $ bin/ssh sched-worker1 nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw,temperature.gpu --format=csv,noheader
 0, 86 %, 7850 MiB, 889.35 W, 69
 …
+
 $ bin/ssh sched-worker1 nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
 14832, /shared/venv/bin/python, 7338 MiB
 …
+
 $ bin/kubectl -n joe exec ddp-long-205020-node-0-0-q8crt -- nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
 16, /shared/venv/bin/python, 7338 MiB
 …
