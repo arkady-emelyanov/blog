@@ -103,17 +103,17 @@ Timing is a behavioural model, not a prediction. Each operation's duration is de
 ```console
 $ bin/ssh sched-worker1 nvidia-smi topo -m
 GPU0	GPU1	GPU2	GPU3	CPU Affinity	NUMA Affinity	GPU NUMA ID
-GPU0	X	NV18	NV18	NV18	0-3	0		2
-GPU1	NV18	X	NV18	NV18	0-3	0		10
-GPU2	NV18	NV18	X	NV18	0-3	1		18
-GPU3	NV18	NV18	NV18	X	0-3	1		26
+GPU0	X	NV18	NV18	NV18	0-1	0		2
+GPU1	NV18	X	NV18	NV18	0-1	0		10
+GPU2	NV18	NV18	X	NV18	6-7	1		18
+GPU3	NV18	NV18	NV18	X	6-7	1		26
 ```
 
 Read it as a table: each row and each column is one of the tray's four GPUs, and each cell says how that pair is connected.
 
 - `X`: the GPU itself
 - `NV18`: the two GPUs are connected through 18 NVLinks, which carry their traffic together. At 50 GB/s per link, that's 900 GB/s in each direction
-- `CPU Affinity`: the CPU cores closest to the GPU
+- `CPU Affinity`: the CPU cores closest to the GPU. The lab splits each tray's cores between its two emulated Grace CPUs, so GPUs 0-1 get the first half and GPUs 2-3 the second; the numbers depend on which host cores the tray was given
 - `NUMA Affinity`: the NUMA node of the CPU closest to the GPU. A GB200 tray has two Grace CPUs, so GPUs 0-1 sit next to node 0 and GPUs 2-3 next to node 1
 - `GPU NUMA ID`: the NUMA node of the GPU's own memory (2, 10, 18 and 26). On GB200, the Grace CPU and the GPU can read and write each other's memory directly, so Linux treats each GPU's memory as another NUMA node: memory without CPUs, further from the CPU than its own
 

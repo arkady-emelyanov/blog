@@ -128,7 +128,7 @@ A typical reason to split a domain is to give a tenant its own GPUs. Give tray 2
 
 ```console
 $ bin/nvlink create tray2 --id 7 sched-worker2
-nvlink: CreatePartition: NMX_ST_GPU_IN_USE: GPU sched-worker2:0 is in partition 32766; remove it there first
+nvlink: CreatePartition: NMX_ST_RESOURCE_USED_IN_ANOTHER_PARTITION: GPU sched-worker2:0 is in partition 32766; remove it there first
 ```
 
 Take the tray out of the default partition first:

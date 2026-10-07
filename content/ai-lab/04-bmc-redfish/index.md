@@ -126,9 +126,11 @@ The NVLinks are listed under each GPU processor, one port for each of the GPU's 
 
 ```console
 $ bin/redfish sched-worker1 /redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Ports/NVLink_3 \
-    | jq -c '{LinkState, LinkStatus, CurrentSpeedGbps, Settings: ."@Redfish.Settings".SettingsObject}'
-{"LinkState":"Enabled","LinkStatus":"LinkUp","CurrentSpeedGbps":200,"Settings":{"@odata.id":"/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Ports/NVLink_3/Settings"}}
+    | jq -c '{LinkState, LinkStatus, CurrentSpeedGbps, Width, Settings: ."@Redfish.Settings".SettingsObject}'
+{"LinkState":"Enabled","LinkStatus":"LinkUp","CurrentSpeedGbps":400,"Width":2,"Settings":{"@odata.id":"/redfish/v1/Systems/HGX_Baseboard_0/Processors/GPU_2/Ports/NVLink_3/Settings"}}
 ```
+
+`CurrentSpeedGbps` is the speed of the whole port: an NVLink 5 link has two lanes (`Width`), 400 Gb/s together, which is 50 GB/s in each direction.
 
 The switch tray BMC describes the other end of the cable. Every switch port knows which tray, GPU and link it's connected to:
 
@@ -190,10 +192,10 @@ $ bin/redfish sched-worker1 …/GPU_2/Ports/NVLink_3 | jq -c '{LinkState, LinkSt
 
 $ bin/ssh sched-worker1 nvidia-smi topo -m
 	GPU0	GPU1	GPU2	GPU3	CPU Affinity	NUMA Affinity	GPU NUMA ID
-GPU0	X	NV18	NV16	NV18	0-3	0		2
-GPU1	NV18	X	NV16	NV18	0-3	0		10
-GPU2	NV16	NV16	X	NV16	0-3	1		18
-GPU3	NV18	NV18	NV16	X	0-3	1		26
+GPU0	X	NV18	NV16	NV18	0-1	0		2
+GPU1	NV18	X	NV16	NV18	0-1	0		10
+GPU2	NV16	NV16	X	NV16	6-7	1		18
+GPU3	NV18	NV18	NV16	X	6-7	1		26
 …
 ```
 
@@ -208,7 +210,7 @@ $ bin/redfish sched-nvswitch /redfish/v1/Fabrics/MGX_NVLinkFabric_0/Switches/NVS
     -X PATCH -d '{"LinkState": "Disabled"}'
 
 $ bin/ssh sched-worker1 'nvidia-smi topo -m | grep ^GPU2; nvidia-smi nvlink -s -i 2 | grep "Link 2:"'
-GPU2	NV17	NV17	X	NV17	0-3	1		18
+GPU2	NV17	NV17	X	NV17	6-7	1		18
 	 Link 2: <inactive>
 ```
 
