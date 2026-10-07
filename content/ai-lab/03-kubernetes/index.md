@@ -160,32 +160,32 @@ The repository's `examples/kubernetes/` has four example jobs, written as JobSet
 $ cd examples/kubernetes
 
 $ ./submit --wait nvl8-hello.yaml
-nvl8-hello-393696
+nvl8-hello-563447
 
-$ cat nvl8-hello-393696.out
-[pod/nvl8-hello-393696-rank-0-4-74f9v/hello] rank 4 on sched-worker2 NVIDIA_VISIBLE_DEVICES=GPU-81477906-d580-de42-e868-ff62e9ef4317: NVIDIA GB200, GPU-81477906-d580-de42-e868-ff62e9ef4317, 1
+$ cat nvl8-hello-563447.out
+[pod/nvl8-hello-563447-rank-0-7-qqdvr/hello] rank 7 on sched-worker2 NVIDIA_VISIBLE_DEVICES=GPU-814804a5-291e-ba91-a4e9-01fb69ea739b: NVIDIA GB200, GPU-814804a5-291e-ba91-a4e9-01fb69ea739b, 1
 …
-[pod/nvl8-hello-393696-rank-0-3-qgclw/hello] rank 3 on sched-worker1 NVIDIA_VISIBLE_DEVICES=GPU-81502f39-9cad-de97-2723-3d7d71928458: NVIDIA GB200, GPU-81502f39-9cad-de97-2723-3d7d71928458, 1
+[pod/nvl8-hello-563447-rank-0-6-m65hh/hello] rank 6 on sched-worker2 NVIDIA_VISIBLE_DEVICES=GPU-8147ef90-7f0c-fc1e-c070-d80c4a3d939f: NVIDIA GB200, GPU-8147ef90-7f0c-fc1e-c070-d80c4a3d939f, 1
 ```
 
 That's eight pods, each holding one different GPU, all in clique 1. DDP works the same way: two pods with four GPUs each, and `torchrun` doing rendezvous on pod 0 through the JobSet's DNS name:
 
 ```console
 $ ./submit --wait ddp-train.yaml
-ddp-train-489951
+ddp-train-784428
 
-$ grep -E "world=|step |rank 0/" ddp-train-489951.out
-[pod/ddp-train-489951-node-0-0-tdt2z/torchrun] world=8 params=537M batch/rank=64 width=8192
-[pod/ddp-train-489951-node-0-0-tdt2z/torchrun] step    1      9.3 ms     55220 samples/s      22 TFLOP/s/GPU
-[pod/ddp-train-489951-node-0-0-tdt2z/torchrun] step   10      4.5 ms    114013 samples/s      46 TFLOP/s/GPU
-[pod/ddp-train-489951-node-0-0-tdt2z/torchrun] step   20      4.3 ms    117940 samples/s      47 TFLOP/s/GPU
-[pod/ddp-train-489951-node-0-0-tdt2z/torchrun] step   30      4.9 ms    105525 samples/s      42 TFLOP/s/GPU
-[pod/ddp-train-489951-node-0-0-tdt2z/torchrun] step   40      4.3 ms    119061 samples/s      48 TFLOP/s/GPU
-[pod/ddp-train-489951-node-0-0-tdt2z/torchrun] step   50      5.8 ms     87613 samples/s      35 TFLOP/s/GPU
-[pod/ddp-train-489951-node-0-0-tdt2z/torchrun] rank 0/8 on ddp-train-489951-node-0-0 cuda:0 (NVIDIA GB200) peak mem 6.1 GiB
+$ grep -E "world=|step |rank 0/" ddp-train-784428.out
+[pod/ddp-train-784428-node-0-0-8rgvd/torchrun] world=8 params=537M batch/rank=64 width=8192
+[pod/ddp-train-784428-node-0-0-8rgvd/torchrun] step    1      7.9 ms     65182 samples/s      26 TFLOP/s/GPU
+[pod/ddp-train-784428-node-0-0-8rgvd/torchrun] step   10      4.3 ms    119891 samples/s      48 TFLOP/s/GPU
+[pod/ddp-train-784428-node-0-0-8rgvd/torchrun] step   20      4.1 ms    125733 samples/s      51 TFLOP/s/GPU
+[pod/ddp-train-784428-node-0-0-8rgvd/torchrun] step   30      4.0 ms    126661 samples/s      51 TFLOP/s/GPU
+[pod/ddp-train-784428-node-0-0-8rgvd/torchrun] step   40      4.0 ms    128022 samples/s      52 TFLOP/s/GPU
+[pod/ddp-train-784428-node-0-0-8rgvd/torchrun] step   50      4.1 ms    124470 samples/s      50 TFLOP/s/GPU
+[pod/ddp-train-784428-node-0-0-8rgvd/torchrun] rank 0/8 on ddp-train-784428-node-0-0 cuda:0 (NVIDIA GB200) peak mem 7.1 GiB
 ```
 
-The default run is only 50 steps. After the first step, which includes warm-up, a step takes between 4.3 and 5.8 ms, in the same range as the same job under Slurm in Part 2. As there, the step time is simulated, and the loss values are not real.
+The default run is only 50 steps. After the first step, which includes warm-up, a step takes between 4.0 and 4.3 ms, in the same range as the same job under Slurm in Part 2. As there, the step time is simulated, and the loss values are not real.
 
 ## Operations
 
@@ -197,19 +197,19 @@ Start a longer DDP run, `ddp-long.yaml`: a copy of `ddp-train.yaml` with `--step
 
 ```console
 $ ./submit ddp-long.yaml
-ddp-long-153244
+ddp-long-479273
 
 $ ./submit nvl8-hello.yaml
-nvl8-hello-828000
+nvl8-hello-370393
 
 $ kubectl get workloads
 NAME                             QUEUE   RESERVED IN   ADMITTED   FINISHED   AGE
-jobset-ddp-long-153244-03f59     gpu     gpu           True                  48s
-jobset-ddp-train-489951-e427a    gpu     gpu           True       True       2m43s
-jobset-nvl8-hello-393696-8ffa7   gpu     gpu           True       True       3m4s
-jobset-nvl8-hello-828000-ef6fa   gpu                   False                 8s
+jobset-ddp-long-479273-f3281     gpu     gpu           True                  59s
+jobset-ddp-train-784428-cf108    gpu     gpu           True       True       2m15s
+jobset-nvl8-hello-370393-dc423   gpu                   False                 9s
+jobset-nvl8-hello-563447-13ea0   gpu     gpu           True       True       2m26s
 
-$ kubectl get workload jobset-nvl8-hello-828000-ef6fa \
+$ kubectl get workload jobset-nvl8-hello-370393-dc423 \
     -o jsonpath='{.status.conditions[?(@.type=="QuotaReserved")].message}'
 couldn't assign flavors to pod set rank: insufficient unused quota for nvidia.com/gpu in flavor gb200, 8 more needed
 ```
@@ -257,9 +257,9 @@ RUNNING 1, PENDING 1
 sched_nodes
 READY 2
 
-# GPU utilisation per tray (4 GPUs × ~86 %)
+# GPU utilisation per tray (4 GPUs × ~88 %)
 sum by (instance) (nvidia_smi_utilization_gpu_ratio)
-3.46, 3.44
+3.52, 3.52
 
 # processes on GPUs
 sum by (instance) (nvidia_smi_compute_apps)
@@ -274,9 +274,9 @@ Grafana's **Lab overview** dashboard shows the same DDP run on the trays:
 
 All eight GPUs move together, as they did under Slurm:
 
-- **GPU utilisation** jumps to 87-88 % when the pods start and drops to 0 when they end.
+- **GPU utilisation** jumps to 86-88 % when the pods start and drops to 0 when they end.
 - **GPU memory used** goes to about 7 GiB per GPU and stays there until the job ends.
-- **GPU power** goes from about 140 W to 880-910 W per GPU.
+- **GPU power** goes from about 140 W to 860-910 W per GPU.
 - **GPU temperature** climbs to 70 °C over about a minute. When the job ends it cools gradually: Kubernetes has no epilog to reset the GPUs, unlike Slurm ([Part 8](@/ai-lab/08-gpu-handover/index.md)).
 - **Processes on GPUs** shows 4 per tray, one per GPU.
 - **NVL8 domain power** is the total for all eight GPUs: about 7.1 kW, from 1.1 kW at idle.
@@ -293,20 +293,20 @@ While the job runs, the pods' GPU work is visible on the trays as it would be fo
 
 ```console
 $ bin/ssh sched-worker1 nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw,temperature.gpu --format=csv,noheader
-0, 86 %, 7850 MiB, 888.75 W, 69
-1, 87 %, 7850 MiB, 875.70 W, 69
+0, 87 %, 7850 MiB, 890.25 W, 70
+1, 87 %, 7850 MiB, 887.85 W, 70
 …
 
 $ bin/ssh sched-worker1 nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
-17606, /shared/venv/bin/python, 7338 MiB
+22749, /shared/venv/bin/python, 7338 MiB
 …
 
-$ bin/kubectl -n joe exec ddp-long-153244-node-0-0-hkv4r -- nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
+$ bin/kubectl -n joe exec ddp-long-479273-node-0-0-5pbc9 -- nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
 16, /shared/venv/bin/python, 7338 MiB
 …
 ```
 
-The same worker appears as PID 17606 on the tray and PID 16 inside the pod: each viewer sees the process under the PID from its own namespace, as with the real driver. [Part 6](@/ai-lab/06-observability/index.md) walks through both dashboards and what to read from each graph.
+The same worker appears as PID 22749 on the tray and PID 16 inside the pod: each viewer sees the process under the PID from its own namespace, as with the real driver. [Part 6](@/ai-lab/06-observability/index.md) walks through both dashboards and what to read from each graph.
 
 ## Next in the series
 

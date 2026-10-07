@@ -105,7 +105,7 @@ Each row is a state timeline: green when the series is 1, red when it's 0. When 
 
 - **14:29:24** `up{job="gpu"}` for `sched-worker2` drops to 0: the GPU exporter on the tray is scraped every 5 s.
 - **14:29:51** `idrac_system_power_on` for `sched-worker2` drops to 0: the BMC is polled every 30 s.
-- **14:30:10** Slurm marks the node as not responding: `sinfo` shows `drained*`, where the `*` means the controller can't reach the node's `slurmd`.
+- **14:30:10** Slurm marks the node as not responding: `sinfo` shows `drained*`, where the `*` means the controller's last ping to the node's `slurmd` got no answer. The controller pings every third of `SlurmdTimeout` (300 s in the lab), and would mark the node `DOWN` only after the full timeout.
 - **14:31:21** powered on.
 - **14:31:24** the GPU exporter is up, and `slurmd` registers again. The node stays drained until it's resumed.
 - **14:31:51** the BMC reports power on, at its next 30 s poll.
