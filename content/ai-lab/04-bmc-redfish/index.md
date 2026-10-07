@@ -149,17 +149,17 @@ $ bin/redfish sched-worker1 /redfish/v1/Chassis/HGX_GPU_0/Sensors | jq -r '.Memb
 
 $ bin/redfish sched-worker1 /redfish/v1/Chassis/HGX_GPU_0/EnvironmentMetrics \
     | jq -c '{Temp: .TemperatureCelsius.Reading, Power: .PowerWatts.Reading}'
-{"Temp":69,"Power":870.639}
+{"Temp":70,"Power":877.525}
 
 $ bin/ssh sched-worker1 nvidia-smi -i 0 --query-gpu=temperature.gpu,power.draw --format=csv
 temperature.gpu, power.draw [W]
-69, 892.33 W
+69, 872.87 W
 
 $ bin/redfish sched-worker1 /redfish/v1/Chassis/Chassis_0/Sensors/Total_GPU_Power_0 | jq -c '{Reading, ReadingUnits}'
-{"Reading":3541.377,"ReadingUnits":"W"}
+{"Reading":3512.52,"ReadingUnits":"W"}
 ```
 
-The temperatures match. The power differs by about 20 W because the two commands ran a moment apart, and a busy GPU's power changes from second to second. `Total_GPU_Power_0` is the sum for all four GPUs.
+The readings differ by 1 °C and about 5 W because the two commands ran a moment apart, and a busy GPU's temperature and power change from second to second. `Total_GPU_Power_0` is the sum for all four GPUs.
 
 Prometheus collects these sensors too, through a Redfish exporter. [Part 6](@/ai-lab/06-observability/index.md) shows them during a power cycle.
 

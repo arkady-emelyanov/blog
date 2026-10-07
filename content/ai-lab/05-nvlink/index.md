@@ -216,9 +216,9 @@ Each block is named after the cluster UUID and clique it was built from. In Kube
 You might expect `nvl8-hello` (2 nodes × 4 GPUs) to wait now. It doesn't:
 
 ```console
-$ sbatch --wait nvl8-hello.sbatch && cat nvl8-hello-7.out
-Submitted batch job 7
-job 7 on sched-worker[1-2]: 8 tasks
+$ sbatch --wait nvl8-hello.sbatch && cat nvl8-hello-15.out
+Submitted batch job 15
+job 15 on sched-worker[1-2]: 8 tasks
 0: rank 0 on sched-worker1 CUDA_VISIBLE_DEVICES=0: NVIDIA GB200, GPU-81501924-f170-f6d0-f2da-dc7595876881, 1, scratch  198G
 …
 4: rank 4 on sched-worker2 CUDA_VISIBLE_DEVICES=0: NVIDIA GB200, GPU-81477906-d580-de42-e868-ff62e9ef4317, 7, scratch  198G
@@ -230,20 +230,20 @@ Ranks 0-3 are in clique 1 and ranks 4-7 in clique 7. Slurm's `topology/block` *p
 The job runs, but it's slower. The two halves can't reach each other over NVLink, so NCCL sends the traffic between them over InfiniBand, which is much slower: each GPU has a 400 Gb/s (50 GB/s) InfiniBand link, against hundreds of GB/s over NVLink. The lab's emulated NCCL does the same: inside each partition it uses NVLink, and between partitions it uses InfiniBand. Here is the same DDP job, 16,000 steps, first on one partition, then split across two:
 
 ```console
-$ grep -E "^step +(10|50|16000) |rank 0/" ddp-train-6.out
-step   10      4.3 ms    119665 samples/s      48 TFLOP/s/GPU
-step   50      4.1 ms    125795 samples/s      51 TFLOP/s/GPU
-step 16000      4.4 ms    115490 samples/s      47 TFLOP/s/GPU
+$ grep -E "^step +(10|50|16000) |rank 0/" ddp-train-13.out
+step   10      4.4 ms    116271 samples/s      47 TFLOP/s/GPU
+step   50      4.1 ms    124550 samples/s      50 TFLOP/s/GPU
+step 16000      4.2 ms    122161 samples/s      49 TFLOP/s/GPU
 rank 0/8 on sched-worker1 cuda:0 (NVIDIA GB200) peak mem 7.1 GiB
 
-$ grep -E "^step +(10|50|16000) |rank 0/" ddp-train-8.out
-step   10      9.8 ms     52224 samples/s      21 TFLOP/s/GPU
-step   50      9.3 ms     55250 samples/s      22 TFLOP/s/GPU
-step 16000      9.8 ms     52000 samples/s      21 TFLOP/s/GPU
+$ grep -E "^step +(10|50|16000) |rank 0/" ddp-train-17.out
+step   10      9.5 ms     53919 samples/s      22 TFLOP/s/GPU
+step   50      9.2 ms     55357 samples/s      22 TFLOP/s/GPU
+step 16000      9.5 ms     54175 samples/s      22 TFLOP/s/GPU
 rank 0/8 on sched-worker1 cuda:0 (NVIDIA GB200) peak mem 7.1 GiB
 ```
 
-Steps take more than twice as long, and the whole job took 2:39 instead of 1:17. During the split run, Prometheus showed the traffic moving to InfiniBand:
+Steps take more than twice as long, and the whole job took 2:39 instead of 1:19. During the split run, Prometheus showed the traffic moving to InfiniBand:
 
 ```
 # InfiniBand traffic from each tray
@@ -252,12 +252,12 @@ sum by (instance) (rate(node_infiniband_port_data_transmitted_bytes_total[1m]))
 
 # NVLink traffic for the whole domain
 sum(rate(nvlink_gpu_tx_bytes_total[1m]))
-~1.36 TB/s (3.52 TB/s on one partition)
+~1.39 TB/s (3.54 TB/s on one partition)
 ```
 
 The "NVLink vs InfiniBand" panel of the Scheduler & NVLink fabric dashboard shows the same shift. I ran the job again with 30,000 steps, first on one partition, then split:
 
-{{< figure src="panel-nvlink-vs-ib.png" alt="Grafana panel: NVLink traffic at about 3.5 TB/s and no InfiniBand traffic during the first run; during the second run NVLink falls to about 1.4 TB/s and InfiniBand rises to about 240 GB/s" caption="NVLink vs InfiniBand panel: the same DDP job on one partition, then split across two" />}}
+{{< figure src="panel-nvlink-vs-ib.png" alt="Grafana panel: NVLink traffic at about 3.7 TB/s and no InfiniBand traffic during the first run; during the second run NVLink falls to about 1.4 TB/s and InfiniBand rises to about 240 GB/s" caption="NVLink vs InfiniBand panel: the same DDP job on one partition, then split across two" />}}
 
 During the first run, all the traffic goes over NVLink. During the split run, NVLink traffic drops to well under half, and InfiniBand carries the traffic between the trays: about 240 GB/s for the domain, 120 GB/s from each tray. The split run also lasts more than twice as long.
 
@@ -305,11 +305,11 @@ With the 8-GPU DDP job from [Part 2](@/ai-lab/02-slurm/index.md) running on one 
 ```
 # NVLink traffic from each tray
 sum by (host) (rate(nvlink_gpu_tx_bytes_total[1m]))
-~1.76 TB/s per tray
+~1.8 TB/s per tray
 
 # traffic per NVSwitch chip (each GPU spreads its links over both)
 rate(nvswitch_tx_bytes_total[1m])
-~1.76 TB/s per chip
+~1.8 TB/s per chip
 
 # switch ports down
 sum(nvswitch_ports) - sum(nvswitch_ports_up)

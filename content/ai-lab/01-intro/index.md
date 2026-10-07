@@ -96,7 +96,7 @@ The hardware and NVIDIA's software are modelled:
 - **The BMCs** follow the GB200 Redfish layout, with power actions that really stop and start the tray, GPU sensors and firmware inventory. IPMI and BlueField DPUs aren't modelled.
 - **InfiniBand** has a topology that tools like topograph can discover, byte counters on the network cards, and its 400 Gb/s link rate in NCCL timing. No packets are sent.
 
-Timing is a behavioural model, not a prediction. Each operation's duration is derived from NVIDIA's published GB200 figures (compute rate, memory, NVLink and InfiniBand bandwidth) and applied to its size. The figures are simplified: one tensor rate covers all low-precision types, and some rates are estimated. Jobs take a plausible time and put a plausible load on the GPUs and links, but the figures aren't calibrated against hardware and don't predict real GB200 performance. The full list is under "What is real and what is modelled" in the lab's [README](https://github.com/arkady-emelyanov/ai-lab).
+Timing is a behavioural model, not a prediction. Durations come from NVIDIA's published GB200 figures (dense compute rates per precision, memory, NVLink and InfiniBand bandwidth) applied to each operation's size. NVIDIA doesn't publish an FP32 rate without tensor cores, so that one is an estimate. Jobs take a plausible time and put a plausible load on the GPUs and links, but the figures aren't calibrated against hardware and don't predict real GB200 performance. The full list is under "What is real and what is modelled" in the lab's [README](https://github.com/arkady-emelyanov/ai-lab).
 
 `nvidia-smi topo -m` shows how the GPUs in one tray are connected to each other. Here it runs on the first GPU tray, `sched-worker1`:
 
@@ -125,10 +125,10 @@ A change travels through the whole stack the way it would on a real cluster. Thi
 2. After a GPU reset, NVML reports the new clique (`nvidia-smi --query-gpu=fabric.cliqueId`).
 3. Within a minute, topograph rewrites Slurm's topology: one block per tray instead of one for both. With Kubernetes, it relabels the nodes instead.
 4. Slurm prefers to keep a job inside one block. An 8-GPU job no longer fits in one, so it spans both.
-5. The emulated NCCL sends the traffic between the two halves over InfiniBand instead of NVLink, and the same training job takes 2:39 instead of 1:17.
-6. Prometheus shows the shift: InfiniBand traffic rises to about 120 GB/s per tray (240 GB/s for the domain), and NVLink traffic falls from 3.52 to 1.36 TB/s.
+5. The emulated NCCL sends the traffic between the two halves over InfiniBand instead of NVLink, and the same training job takes 2:39 instead of 1:19.
+6. Prometheus shows the shift: InfiniBand traffic rises to about 120 GB/s per tray (240 GB/s for the domain), and NVLink traffic falls from 3.54 to 1.39 TB/s.
 
-{{< figure src="/ai-lab/05-nvlink/panel-nvlink-vs-ib.png" alt="Grafana panel: NVLink traffic at about 3.5 TB/s and no InfiniBand traffic during the first run; during the second run NVLink falls to about 1.4 TB/s and InfiniBand rises to about 240 GB/s" caption="NVLink vs InfiniBand traffic: the same DDP job on one partition, then split across two" />}}
+{{< figure src="/ai-lab/05-nvlink/panel-nvlink-vs-ib.png" alt="Grafana panel: NVLink traffic at about 3.7 TB/s and no InfiniBand traffic during the first run; during the second run NVLink falls to about 1.4 TB/s and InfiniBand rises to about 240 GB/s" caption="NVLink vs InfiniBand traffic: the same DDP job on one partition, then split across two" />}}
 
 The times come from the timing model, so what matters is the chain of effects and their direction, not the exact numbers.
 

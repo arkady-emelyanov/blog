@@ -19,7 +19,7 @@ local_image = "ai-lab/06-observability/card.png"
 
 ## Overview
 
-The earlier parts each peeked at a metric or two. This one is about monitoring as a whole: which layers of a GPU cluster need watching, what each layer's signals mean, and how to read the lab's Grafana dashboards. The screenshots come from one scripted 10-minute run on the lab in Kubernetes mode. The dashboards are identical in Slurm mode.
+The earlier parts each peeked at a metric or two. This one is about monitoring as a whole: which layers of a GPU cluster need watching, what each layer's signals mean, and how to read the lab's Grafana dashboards. The screenshots come from one scripted 11-minute run on the lab in Slurm mode. The dashboards are identical in Kubernetes mode.
 
 {% <admonition type="note" title="The numbers are simulated"> %}
 The GPU utilisation, power and temperature in this post are modelled, and the NVLink and InfiniBand bytes are counted, not sent. The values follow the load, which is enough to build dashboards, alerts and runbooks on, but they say nothing about how a real GB200 performs.
@@ -52,7 +52,6 @@ gpu	sched-worker1:9835	up
 gpu	sched-worker2:9835	up
 juicefs	sched-control:9567	up
 …
-kube-state-metrics	sched-control:30808	up
 node	sched-control:9100	up
 …
 nvlink	sched-nvswitch:9372	up
@@ -60,6 +59,7 @@ prometheus	localhost:9090	up
 redfish	sched-nvswitch-bmc	up
 redfish	sched-worker1-bmc	up
 redfish	sched-worker2-bmc	up
+slurm	localhost:9092	up
 ```
 
 Slurm and Kubernetes export completely different metrics, so recording rules turn either one into the same handful of series: `sched_gpus`, `sched_gpus_alloc`, `sched_node_gpus_alloc`, `sched_user_gpus`, `sched_jobs{state}` and `sched_nodes{state}`. The dashboards use only those, which is why they work with either scheduler.
@@ -72,25 +72,26 @@ The out-of-band layer polls the BMCs, not the trays, through a generic Redfish e
 
 All the screenshots show the same window, in Grafana's local time:
 
-- **22:10:24** idle (the tail at the very left edge of some panels is the end of an earlier test job)
-- **22:11:24** 8-GPU PyTorch DDP job submitted (2 pods × 4 GPUs, 60,000 steps)
-- **22:12:24** `nvl8-hello` (8 GPUs) submitted; Kueue queues it, since no GPUs are free
-- **22:13:25** NVSwitch_0 port 19 disabled through the switch BMC (`sched-worker1` GPU 2, link 2)
-- **22:14:25** port re-enabled
-- **22:15:54** DDP finishes on both trays; `nvl8-hello` runs for a few seconds
-- **22:17:00** `sched-worker2` cordoned, then powered off through its BMC (`ForceOff`)
-- **22:19:01** powered on through its BMC; Ready and uncordoned at 22:19:07
-- **22:20:37** idle again
+- **14:22:27** idle (the tail at the very left edge of some panels is the end of an earlier test job)
+- **14:23:27** 8-GPU PyTorch DDP job submitted (2 nodes × 4 GPUs, 60,000 steps)
+- **14:24:27** `nvl8-hello` (8 GPUs) submitted; Slurm queues it, since no GPUs are free
+- **14:25:28** NVSwitch_0 port 19 disabled through the switch BMC (`sched-worker1` GPU 2, link 2)
+- **14:26:28** port re-enabled
+- **14:27:50** DDP finishes on both trays; `nvl8-hello` runs for a second
+- **14:28:50** `sched-worker2` drained
+- **14:29:20** `sched-worker2` powered off through its BMC (`ForceOff`)
+- **14:31:21** powered on through its BMC, and resumed in Slurm at 14:31:24
+- **14:33:00** idle again
 
 ## Reading the GPU layer
 
 {{< figure src="lab-overview.png" caption="Lab overview dashboard during the scenario" />}}
 
-**GPU utilisation** is the share of time a kernel was running on the GPU. It isn't a measure of how efficiently the GPU was used. All eight lines jump from 0 to 88-89 % together, stay flat, and drop together when the job ends. That's what healthy data-parallel training looks like: every rank does the same work at the same pace. A line or a group of lines sagging below the pack points to a **straggler**: a slow GPU, a degraded link, or a tray with CPU-side contention. On real hardware NCCL's collectives make every rank wait for the slowest one, so a straggler drags the whole job down while its own GPU looks the least busy. So compare GPUs against each other, not only against a threshold.
+**GPU utilisation** is the share of time a kernel was running on the GPU. It isn't a measure of how efficiently the GPU was used. All eight lines jump from 0 to 86-88 % together, stay flat, and drop together when the job ends. That's what healthy data-parallel training looks like: every rank does the same work at the same pace. A line or a group of lines sagging below the pack points to a **straggler**: a slow GPU, a degraded link, or a tray with CPU-side contention. On real hardware NCCL's collectives make every rank wait for the slowest one, so a straggler drags the whole job down while its own GPU looks the least busy. So compare GPUs against each other, not only against a threshold.
 
-**GPU power** follows utilisation, from about 140 W at idle to 890-910 W per GPU under load. **NVL8 domain power** is the sum: 1.12 kW idle, about 7.2 kW with all eight GPUs working, and 0.56 kW while `sched-worker2` is powered off, because a tray that's off draws nothing. Domain power is the number facilities and capacity planning care about.
+**GPU power** follows utilisation, from about 140 W at idle to 870-900 W per GPU under load. **NVL8 domain power** is the sum: 1.12 kW idle, about 7.1 kW with all eight GPUs working, and 0.56 kW while `sched-worker2` is powered off, because a tray that's off draws nothing. Domain power is the number facilities and capacity planning care about.
 
-**GPU temperature** moves on its own, slower clock: power steps up within one scrape, temperature climbs over about a minute to 70 °C and cools gradually after the job ends. That thermal lag is why a temperature alert needs a `for:` duration, and why a GPU that's hot *right after* a job isn't a problem.
+**GPU temperature** moves on its own, slower clock: power steps up within one scrape, temperature climbs over about a minute to 70 °C. After the job it drops straight back to idle, because Slurm's epilog resets the GPUs ([Part 8](@/ai-lab/08-gpu-handover/index.md)); without a reset, as in Kubernetes mode ([Part 3](@/ai-lab/03-kubernetes/index.md)), it cools over about a minute. That thermal lag is why a temperature alert needs a `for:` duration, and why a GPU that's hot *right after* a job isn't a problem.
 
 **GPU memory used** jumps to about 7 GiB per GPU when the model and optimizer state are allocated, then stays flat: DDP keeps a full copy of the model on every GPU. A line that keeps climbing during training is a leak, and a line close to the 185 GiB capacity is an out-of-memory crash waiting to happen. **Processes on GPUs** shows 4 per tray, one `torchrun` worker per GPU, and drops to 0 when the job ends. Memory or processes that outlive the job mean a leftover process is holding the GPU, and the next job to land there will start with less than it asked for.
 
@@ -100,15 +101,14 @@ The bottom of the same dashboard puts the BMC's view next to the tray's own:
 
 {{< figure src="panel-tray-power-state.png" caption="Tray power state panel: BMCs vs GPU exporters" />}}
 
-Each row is a state timeline: green when the series is 1, red when it's 0. When `sched-worker2` was powered off at 22:17:00, the signals changed in this order:
+Each row is a state timeline: green when the series is 1, red when it's 0. When `sched-worker2` was powered off at 14:29:20, the signals changed in this order:
 
-- **22:17:04** `up{job="gpu"}` for `sched-worker2` drops to 0: the GPU exporter on the tray is scraped every 5 s.
-- **22:17:21** `idrac_system_power_on` for `sched-worker2` drops to 0: the BMC is polled every 30 s.
-- **22:17:59** the node turns `NotReady` in Kubernetes: the node controller waits for missed heartbeats.
-- **22:19:01** powered on.
-- **22:19:04** the GPU exporter is up.
-- **22:19:14** the node is Ready.
-- **22:19:21** the BMC reports power on, at its next 30 s poll.
+- **14:29:24** `up{job="gpu"}` for `sched-worker2` drops to 0: the GPU exporter on the tray is scraped every 5 s.
+- **14:29:51** `idrac_system_power_on` for `sched-worker2` drops to 0: the BMC is polled every 30 s.
+- **14:30:10** Slurm marks the node as not responding: `sinfo` shows `drained*`, where the `*` means the controller can't reach the node's `slurmd`.
+- **14:31:21** powered on.
+- **14:31:24** the GPU exporter is up, and `slurmd` registers again. The node stays drained until it's resumed.
+- **14:31:51** the BMC reports power on, at its next 30 s poll.
 
 The `sched-worker2 BMC` row stays green the whole time: the BMC kept answering while the tray it manages was off. Three cases that look the same from the GPU exporter alone can now be told apart:
 
@@ -128,7 +128,7 @@ The lab's BMCs read the GPUs' state the way a real BMC reads them over its sideb
 
 The top row compares supply with demand. The sparklines under **GPUs allocated**, **Running jobs** and **Pending jobs** show the history behind the current value of 0: allocation stays at 8 while the DDP job runs, and *Pending jobs* rises while `nvl8-hello` waits. Allocated close to total with jobs pending means the cluster is full, which is a capacity signal. Allocated below total with jobs pending means the jobs don't fit, either because of topology or quotas ([Part 3](@/ai-lab/03-kubernetes/index.md#operations)) or because a node is out.
 
-**GPUs total** is easy to misread. It stayed at 8 while `sched-worker2` was off: Kubernetes keeps reporting a NotReady node's allocatable GPUs, so the capacity series only dipped to 4 for a moment as the tray came back (22:19:19-22:19:34). Read *GPUs total* together with **Nodes by state**, where the NOT_READY band (22:18:00-22:19:15) shows the tray was gone.
+**GPUs total** is easy to misread. It stayed at 8 while `sched-worker2` was drained and powered off, because it counts the GPUs configured in the Slurm partition, whatever state their nodes are in. Read *GPUs total* together with **Nodes by state**, which uses Slurm's state names: `sched-worker2` moves from `idle` to `drain` (14:29:34) and to `drain*` (14:30:34-14:32:04) while the tray is off. The Slurm exporter is scraped every 30 s, so these times trail the ones from `sinfo` above.
 
 **GPUs allocated per node**, **Jobs by state** and **Nodes by state** are stacked: each series is drawn on top of the previous one, so the top edge is the total and each band is one series' share. *GPUs allocated per node* reaches 8 as two bands of 4, and the top line isn't `sched-worker2` holding 8 GPUs. *Jobs by state* leaves out completed jobs, whose ever-growing count would flatten everything else: the DDP job runs (blue), and `nvl8-hello` sits underneath as pending (yellow) until the DDP job is done. Check whether a panel is stacked before you read a value off it.
 
@@ -140,7 +140,7 @@ The **NVLink fabric** row turns Part 4's experiment into graphs. While the switc
 
 Utilisation didn't move when the link went down. In the lab, the emulated NCCL doesn't slow a rank down for a lost link; it only slows down when traffic has to cross NVLink partitions ([Part 5](@/ai-lab/05-nvlink/index.md)). On real hardware it may, and a rank missing 1 of 18 links is exactly the kind of fault you only catch by watching the fabric layer.
 
-**NVLink TX per GPU** shows the all-reduce traffic: about 445 GB/s per GPU, the same on both trays. **NVSwitch throughput** shows the same traffic from the switch side, about 1.77-1.79 TB/s per chip. **GPUs per NVLink partition** stays at 8 in the default partition; a split like the one in Part 5 would show up there as two lines.
+**NVLink TX per GPU** shows the all-reduce traffic: about 450 GB/s per GPU, the same on both trays. **NVSwitch throughput** shows the same traffic from the switch side, about 1.79-1.80 TB/s per chip. **GPUs per NVLink partition** stays at 8 in the default partition; a split like the one in Part 5 would show up there as two lines.
 
 The **InfiniBand** row at the bottom shows NCCL traffic that has to leave NVLink: **InfiniBand TX per tray**, and **NVLink vs InfiniBand** for the whole domain. In this run all eight GPUs are in one partition, so InfiniBand stays at 0 and all the traffic is on NVLink. A job split across NVLink partitions would move part of it to InfiniBand ([Part 5](@/ai-lab/05-nvlink/index.md)).
 

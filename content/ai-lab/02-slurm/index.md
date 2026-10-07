@@ -182,12 +182,12 @@ DDP (distributed data parallel) is the most common way to train on several GPUs:
 
 ```console
 $ sbatch ddp-train.sbatch --steps 60000
-Submitted batch job 2
+Submitted batch job 11
 
-$ grep -E "^step +(10|50|60000) |rank 0/" ddp-train-2.out
-step   10      4.2 ms    120783 samples/s      49 TFLOP/s/GPU
-step   50      4.4 ms    115140 samples/s      46 TFLOP/s/GPU
-step 60000      4.4 ms    115881 samples/s      47 TFLOP/s/GPU
+$ grep -E "^step +(10|50|60000) |rank 0/" ddp-train-11.out
+step   10      4.7 ms    108994 samples/s      44 TFLOP/s/GPU
+step   50      4.1 ms    125887 samples/s      51 TFLOP/s/GPU
+step 60000      4.3 ms    119404 samples/s      48 TFLOP/s/GPU
 rank 0/8 on sched-worker1 cuda:0 (NVIDIA GB200) peak mem 7.1 GiB
 ```
 
@@ -203,8 +203,8 @@ Every job is recorded with its GPU allocation:
 
 ```console
 $ sacct -X -o JobID,JobName,User,Account,AllocTRES%45,Elapsed,State
-2             ddp-train       joe        lab  billing=8,cpu=8,gres/gpu=8,mem=15000M,node=2   00:04:41  COMPLETED
-3            nvl8-hello       joe        lab  billing=8,cpu=8,gres/gpu=8,mem=15000M,node=2   00:00:01  COMPLETED
+11            ddp-train       joe        lab  billing=8,cpu=8,gres/gpu=8,mem=15000M,node=2   00:04:22  COMPLETED
+12           nvl8-hello       joe        lab  billing=8,cpu=8,gres/gpu=8,mem=15000M,node=2   00:00:01  COMPLETED
 ```
 
 The job IDs differ from the ones above because the listings come from separate runs of the lab. GPU-hour reports and chargeback are built on this data.
@@ -265,13 +265,13 @@ Slurm knows which GPUs a job holds, but not whether the job is using them. While
 ```console
 $ bin/ssh sched-worker1 nvidia-smi --query-gpu=index,utilization.gpu,memory.used,power.draw,temperature.gpu --format=csv
 index, utilization.gpu [%], memory.used [MiB], power.draw [W], temperature.gpu
-0, 79 %, 7850 MiB, 813.26 W, 67
-1, 81 %, 7850 MiB, 850.17 W, 68
+0, 86 %, 7850 MiB, 863.87 W, 70
+1, 86 %, 7850 MiB, 871.89 W, 69
 …
 
 $ bin/ssh sched-worker1 nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 pid, process_name, used_memory [MiB]
-10404, /shared/venv/bin/python, 7338 MiB
+4375, /shared/venv/bin/python, 7338 MiB
 …
 ```
 
@@ -294,13 +294,13 @@ sched_user_gpus
 sched_jobs
 RUNNING 1, PENDING 1
 
-# GPU utilisation per tray (4 GPUs × ~80 %)
+# GPU utilisation per tray (4 GPUs × ~86 %)
 sum by (instance) (nvidia_smi_utilization_gpu_ratio)
-3.32, 3.38
+3.45, 3.48
 
 # all-reduce traffic over NVLink
 sum(rate(nvlink_gpu_tx_bytes_total[1m]))
-~3.4 TB/s
+~3.6 TB/s
 ```
 
 ### Lab overview dashboard
@@ -309,14 +309,14 @@ Open Grafana (`http://10.107.111.10:3000`) and the **Lab overview** dashboard:
 
 {{< figure src="lab-overview.png" alt="Lab overview dashboard: GPU utilisation, memory, power, temperature and processes rising together while the DDP job runs" caption="Lab overview dashboard during the DDP run" />}}
 
-The screenshot comes from a separate run, so its values differ a little from the samples above. All eight GPUs move together:
+All eight GPUs move together:
 
-- **GPU utilisation** jumps to about 87 % when the job starts and drops to 0 when it ends.
+- **GPU utilisation** jumps to about 86-88 % when the job starts and drops to 0 when it ends.
 - **GPU memory used** goes to about 7 GiB per GPU and stays there until the job ends.
-- **GPU power** goes from about 140 W to 870-900 W per GPU.
+- **GPU power** goes from about 140 W to 860-900 W per GPU.
 - **GPU temperature** climbs to 69-70 °C over about a minute. When the job ends, it drops straight back to idle: the epilog resets the job's GPUs ([Part 8](@/ai-lab/08-gpu-handover/index.md)).
 - **Processes on GPUs** shows 4 per tray, one per GPU.
-- **NVL8 domain power** is the total for all eight GPUs: about 7 kW.
+- **NVL8 domain power** is the total for all eight GPUs: about 7.1 kW.
 
 The panels at the bottom come from the BMCs; [Part 6](@/ai-lab/06-observability/index.md) covers them.
 
