@@ -19,7 +19,7 @@ Most of those layers never use a GPU for computation. Slurm reads a GPU count fr
 
 ## What the lab is made of
 
-The hardware side is one NVIDIA GB200-class **NVL8** NVLink domain. An NVLink domain is a set of GPUs that can all reach each other over NVLink, even across trays, without going through the network. It's the unit a scheduler has to respect when it places a multi-GPU job. The lab's domain has:
+The hardware side is one NVIDIA GB200-class **NVL8** NVLink domain. [NVLink](https://www.nvidia.com/en-us/data-center/nvlink/) is NVIDIA's GPU-to-GPU interconnect, and an NVLink domain is a set of GPUs that can all reach each other over it, even across trays, without going through the network. It's the unit a scheduler has to respect when it places a multi-GPU job. The lab's domain has:
 
 - 2x GPU compute trays with 4x GB200 GPUs each,
 - an NVLink switch tray with two NVSwitch chips (144 ports),
@@ -57,7 +57,7 @@ GPU2	NV18	NV18	X	NV18	0-3	0		N/A
 GPU3	NV18	NV18	NV18	X	0-3	0		N/A
 ```
 
-`NV18` means the two GPUs reach each other over 18 NVLinks. Each GB200 GPU has 18 NVLinks ([NVIDIA's NVLink specifications](https://www.nvidia.com/en-us/data-center/nvlink/)). They don't connect GPUs directly: all 18 go to the NVSwitch chips on the switch tray, and the switches connect every GPU to every other. So any two GPUs can use all 18 links to talk to each other. The matrix reflects the lab's current state, so changes made through other interfaces show up in it. If you disable two of a GPU's NVLinks through the BMC, `NV18` turns into `NV16` for that GPU. If you move a tray into its own NVLink partition, Slurm's block topology or Kubernetes' node labels change within a minute. Parts 4 and 5 are built around that feedback loop.
+Each `NV18` means the two GPUs are connected through 18 NVLinks. The matrix reflects the lab's current state, so changes made through other interfaces show up in it. If you disable two of a GPU's NVLinks through the BMC, `NV18` turns into `NV16` for that GPU. If you move a tray into its own NVLink partition, Slurm's block topology or Kubernetes' node labels change within a minute. Parts 4 and 5 are built around that feedback loop.
 
 ## What you can practise
 

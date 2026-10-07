@@ -9,19 +9,19 @@ social_media_card = "card.png"
 local_image = "ai-lab/05-nvlink/card.png"
 +++
 
-[Part 4](@/ai-lab/04-bmc-redfish/index.md) broke individual NVLinks through the BMCs. This part steps back to the whole fabric. We'll cover what an NVLink domain and its partitions are, how to query and change them through the lab's partition controller, how a partition change ends up in the scheduler, and what the fabric looks like in Prometheus. The examples run in Slurm mode; the Kubernetes counterpart is noted where it differs.
+[Part 4](@/ai-lab/04-bmc-redfish/index.md) broke individual NVLinks through the BMCs. This part steps back to the whole fabric. I'll cover what an NVLink domain and its partitions are, how to query and change them through the lab's partition controller, how a partition change ends up in the scheduler, and what the fabric looks like in Prometheus. The examples run in Slurm mode; the Kubernetes counterpart is noted where it differs.
 
 ## The concepts
 
 On a GB200 NVL72 rack each GPU has 18 NVLinks, one to each of the rack's 18 NVSwitch chips (9 switch trays × 2 chips). The lab models a single switch tray, so each GPU uses 9 links on each of its 2 chips. Together, GPUs and switches form one **NVLink domain**: any GPU can reach any other at NVLink speed, even across trays, without touching the network. That's why a 72-GPU rack can train like a single big machine.
 
-A domain is usually shared, so the switch trays can cut it into **partitions**, isolated groups of GPUs that can only talk to each other. NVIDIA's NMX Controller (NMX-C) manages them. Every GPU reports its partition to software as a **clique ID** (`nvidia-smi --query-gpu=fabric.cliqueId`).
+A domain is usually shared, so the switch trays can cut it into **partitions**, isolated groups of GPUs that can only talk to each other. They work much like VLANs on an Ethernet switch. NVIDIA's NMX Controller (NMX-C) manages them. Every GPU reports its partition to software as a **clique ID** (`nvidia-smi --query-gpu=fabric.cliqueId`).
 
-Schedulers care because a job whose ranks sit in different partitions can't use NVLink between them. The scheduler therefore needs to know the partition layout and keep jobs inside one partition.
+Schedulers care because a job whose ranks sit in different partitions can't use NVLink between them. The scheduler therefore needs to know the partition layout and keep jobs inside one partition. Partitions are configured on the switch side, not in the scheduler, so the layout has to be passed along. Most of this post is about how that happens.
 
 In the lab, the domain is 8 GPUs, the switch tray has two NVSwitch chips with 72 ports each, and `sched-nvswitch` runs `fakenmxc`, an NMX-C-style controller. It speaks gRPC on port 9370 (with its own `.proto`, since NVIDIA's is proprietary) and serves fabric metrics on port 9372.
 
-## Observation
+## Looking at the fabric
 
 From the tray, NVML shows the fabric registration of every GPU:
 
@@ -32,7 +32,7 @@ index, fabric.cluster_uuid, fabric.clique_id
 …
 ```
 
-From the switch side, `bin/nvlink` asks the partition controller:
+From the switch side, the repository's `bin/nvlink` helper asks the partition controller (more on the helper below):
 
 ```console
 $ bin/nvlink domain
@@ -87,7 +87,7 @@ The same appears in metrics as `nvlink_gpu_active_links{host="sched-worker1",gpu
 
 ## Operations: split the domain
 
-Give tray 2 its own partition. A GPU belongs to at most one partition, so creating the partition straight away fails:
+A typical reason to split a domain is to give a tenant its own GPUs. Give tray 2 its own partition. A GPU belongs to at most one partition, so creating the partition straight away fails:
 
 ```console
 $ bin/nvlink create tray2 --id 7 sched-worker2
@@ -99,11 +99,13 @@ Take the tray out of the default partition first:
 ```console
 $ bin/nvlink remove default sched-worker2
 GPUs removed: 32766 default
+
 $ bin/nvlink partitions
 ID     NAME     GPUS  STATE   HEALTH   MEMBERS
 32766  default  4     ACTIVE  healthy  sched-worker1:0-3
 
 in no partition: sched-worker2:0-3
+
 $ bin/ssh sched-worker2 nvidia-smi --query-gpu=index,fabric.cliqueId --format=csv
 index, fabric.clique_id
 0, 0
@@ -117,10 +119,12 @@ Clique `0` means the GPU is in no partition. On real hardware that GPU now has n
 ```console
 $ bin/nvlink create tray2 --id 7 sched-worker2
 partition created: 7 tray2
+
 $ bin/nvlink partitions
 ID     NAME     GPUS  STATE   HEALTH   MEMBERS
 7      tray2    4     ACTIVE  healthy  sched-worker2:0-3
 32766  default  4     ACTIVE  healthy  sched-worker1:0-3
+
 $ bin/ssh sched-worker2 nvidia-smi --query-gpu=index,fabric.cliqueId --format=csv
 index, fabric.clique_id
 0, 7
@@ -151,6 +155,10 @@ BlockName=block002 Nodes=sched-worker2
 
 Each block is named after the cluster UUID and clique it was built from. In Kubernetes mode the same pipeline relabels the nodes instead (`accelerator.topograph.run/domain=<uuid>.<clique>`, plus GPU Feature Discovery's `nvidia.com/gpu.clique`). [Part 3](@/ai-lab/03-kubernetes/index.md) shows those labels.
 
+{% <admonition type="note" title="Partitions smaller than a tray"> %}
+`bin/nvlink` also takes single GPUs (`sched-worker1:2`, `sched-worker1:2-3`), so a partition can hold part of a tray, down to one GPU. NVML and the tray BMC follow that per GPU, but the schedulers can't use it. topograph keeps one NVLink domain per node ([`HostInfo`](https://github.com/dsx-ai-factory/topograph/blob/03cde87/pkg/topology/domain.go)), because a Slurm block and Kubernetes labels are per node. When a node's GPUs report two cliques, its run fails with "ambiguous NVL partition IDs" ([`ParseNvidiaSMIOutput`](https://github.com/dsx-ai-factory/topograph/blob/03cde87/pkg/accelerator/nvidia_smi.go)), and the last good topology stays in place without any other warning. Keep partitions to whole trays.
+{% </admonition> %}
+
 ### The surprise: an 8-GPU job still runs
 
 You might expect `nvl8-hello` (2 nodes × 4 GPUs) to wait now. It doesn't:
@@ -164,17 +172,21 @@ job 21 on sched-worker[1-2]: 8 tasks
 …
 ```
 
-Ranks 0–3 are in clique 1 and ranks 4–7 in clique 7. Slurm's `topology/block` *prefers* to keep a job inside one block, but a job larger than any block is allowed to span several. Newer Slurm releases add `--segment` and `BlockSizes` to control that; the lab runs Ubuntu's Slurm 23.11, which has neither. On real hardware, this job's NCCL traffic between the halves would fall back to the network. The lab doesn't model that: the fake NCCL ranks don't communicate and ignore cliques, so the job's timing is unchanged.
+Ranks 0–3 are in clique 1 and ranks 4–7 in clique 7. Slurm's `topology/block` *prefers* to keep a job inside one block, but a job larger than any block is allowed to span several. Newer Slurm versions can control this (`--segment`, `BlockSizes`), but the lab runs Slurm 23.11, which can't.
 
-Kubernetes behaves differently. The lab's JobSets set `kueue.x-k8s.io/podset-required-topology` on the NVLink domain label, so Kueue keeps the same job queued rather than splitting it. The same partition change gives you two different scheduler behaviours, which makes the lab a good place to study them.
+On real hardware, the two halves of this job would talk over the network instead of NVLink, and the job would run slower. The lab doesn't show that: its emulated NCCL ignores cliques, so the job runs at the same speed.
+
+Kubernetes behaves differently. The lab's JobSets require all pods to be in one NVLink domain (`kueue.x-k8s.io/podset-required-topology`), so Kueue keeps the same job waiting instead of splitting it. Slurm runs the job split, Kueue doesn't run it at all. Which is better depends on the job.
 
 Merge back by deleting the partition, which leaves its GPUs in no partition, and adding the tray to the default partition again. The default block returns within a minute:
 
 ```console
 $ bin/nvlink delete tray2
 partition deleted; its GPUs are in no partition
+
 $ bin/nvlink add default sched-worker2
 GPUs added: 32766 default
+
 $ bin/nvlink partitions
 ID     NAME     GPUS  STATE   HEALTH   MEMBERS
 32766  default  8     ACTIVE  healthy  sched-worker1:0-3 sched-worker2:0-3
@@ -182,7 +194,7 @@ ID     NAME     GPUS  STATE   HEALTH   MEMBERS
 
 ## Telemetry
 
-The controller reads per-GPU NVLink byte counters that the fake CUDA stack keeps for NCCL collectives and GPU-to-GPU copies, and exposes them alongside the link and partition state:
+The controller also reads per-GPU NVLink byte counters that the emulated CUDA stack keeps for NCCL collectives and GPU-to-GPU copies, and exposes them alongside the link and partition state:
 
 ```console
 $ curl -s http://10.107.111.34:9372/metrics | grep -E '^(nvlink_domain_info|nvlink_partition_gpus|nvswitch_ports_up)'

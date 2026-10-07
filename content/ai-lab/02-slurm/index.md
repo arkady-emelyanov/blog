@@ -9,9 +9,9 @@ social_media_card = "card.png"
 local_image = "ai-lab/02-slurm/card.png"
 +++
 
-[Part 1](@/ai-lab/01-intro/index.md) introduced the lab: one NVL8 NVLink domain with two trays of four emulated GB200 GPUs, running on a single Linux machine. This post covers the default scheduler, Slurm 23.11.
+[Part 1](@/ai-lab/01-intro/index.md) introduced the lab and NVLink, NVIDIA's GPU-to-GPU interconnect: one NVL8 NVLink domain with two trays of four emulated GB200 GPUs, running on a single Linux machine. This post covers the default scheduler, Slurm 23.11.
 
-We'll look at how Slurm is configured for GPUs, run jobs from a one-liner up to PyTorch DDP across both trays, do some routine operations, and watch it all in Prometheus.
+I'll look at how Slurm is configured for GPUs, run jobs from a one-liner up to PyTorch DDP across both trays, do some routine operations, and watch it all in Prometheus.
 
 Commands prefixed with `$` run on the login node as `joe`, the lab's regular user from [Part 1](@/ai-lab/01-intro/index.md#first-contact) (`bin/ssh login`). Commands that start with `bin/` run from the repository root on the host.
 
@@ -210,7 +210,7 @@ JOBID PARTITION     NAME     USER ST  TIME  NODES NODELIST(REASON)
 
 The partitions in that message are **Slurm partitions**, not NVLink ones. A Slurm partition is a named group of nodes that jobs are submitted to, much like a queue; the lab has one, `gpu`.
 
-`scontrol update nodename=sched-worker2 state=resume` brings the node back, and job 17 runs within seconds. In [Part 4](@/ai-lab/04-bmc-redfish/index.md) we power-cycle a tray through its BMC, which is the other half of this runbook.
+`scontrol update nodename=sched-worker2 state=resume` brings the node back, and job 17 runs within seconds. In [Part 4](@/ai-lab/04-bmc-redfish/index.md) I power-cycle a tray through its BMC, which is the other half of this runbook.
 
 ### GPU quotas
 

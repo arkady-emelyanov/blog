@@ -9,7 +9,7 @@ social_media_card = "card.png"
 local_image = "ai-lab/04-bmc-redfish/card.png"
 +++
 
-Parts [2](@/ai-lab/02-slurm/index.md) and [3](@/ai-lab/03-kubernetes/index.md) used the cluster the way its users do, through a scheduler. A scheduler only knows what each tray's operating system reports, so a hung or powered-off tray can look healthy to it for minutes. This part covers the operator's back door: the baseboard management controllers (BMCs), which manage the hardware independently of the OS. We'll walk the Redfish tree, break NVLinks on purpose, and power-cycle a tray. The examples run in Slurm mode, but the BMCs are identical with Kubernetes. Commands that start with `bin/` run on the host from the repository root.
+Parts [2](@/ai-lab/02-slurm/index.md) and [3](@/ai-lab/03-kubernetes/index.md) used the cluster the way its users do, through a scheduler. A scheduler only knows what each tray's operating system reports, so a hung or powered-off tray can look healthy to it for minutes. This part covers the operator's back door: the baseboard management controllers (BMCs), which manage the hardware independently of the OS. I'll walk the Redfish tree, break NVLinks (NVIDIA's GPU-to-GPU links, introduced in [Part 1](@/ai-lab/01-intro/index.md#what-the-lab-is-made-of)) on purpose, and power-cycle a tray. The examples run in Slurm mode, but the BMCs are identical with Kubernetes. Commands that start with `bin/` run on the host from the repository root.
 
 ## BMCs and Redfish in two paragraphs
 

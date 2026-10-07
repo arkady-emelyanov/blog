@@ -11,7 +11,7 @@ local_image = "ai-lab/03-kubernetes/card.png"
 
 [Part 2](@/ai-lab/02-slurm/index.md) ran the lab under Slurm. This part uses Kubernetes as the scheduler on the same hardware.
 
-Slurm handles GPU allocation, topology and queueing itself. Kubernetes wasn't designed for batch GPU work, so these are handled by several add-ons. The most important one is [Kueue](https://github.com/kubernetes-sigs/kueue), which adds job queues and GPU quotas to Kubernetes. We'll look at which add-on does what, how GPUs and NVLink topology show up as Kubernetes objects, run the same jobs as pods, and see how Kueue queues them.
+Slurm handles GPU allocation, topology and queueing itself. Kubernetes wasn't designed for batch GPU work, so these are handled by several add-ons. The most important one is [Kueue](https://github.com/kubernetes-sigs/kueue), which adds job queues and GPU quotas to Kubernetes. I'll look at which add-on does what, how GPUs and NVLink topology (NVLink is introduced in [Part 1](@/ai-lab/01-intro/index.md#what-the-lab-is-made-of)) show up as Kubernetes objects, run the same jobs as pods, and see how Kueue queues them.
 
 To switch, set `scheduler: k3s` in `inventory/group_vars/all.yml`, then run `make down && make up` ([Part 1](@/ai-lab/01-intro/index.md#setup)). Commands prefixed with `$` run on the login node as `joe` (`bin/ssh login`), whose kubeconfig and namespace are already set up. `bin/kubectl` runs `kubectl` from the repository root on the host with the cluster-admin kubeconfig; commands that need admin rights use it.
 
