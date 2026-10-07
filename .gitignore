@@ -2,4 +2,4 @@
 .venv/
 .bin/
 public/
-tools/vendor/
+.claude/skills/
