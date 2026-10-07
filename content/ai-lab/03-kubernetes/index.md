@@ -13,7 +13,7 @@ local_image = "ai-lab/03-kubernetes/card.png"
 
 Slurm handles GPU allocation, topology and queueing itself. Kubernetes wasn't designed for batch GPU work, so these are handled by several add-ons. The most important one is [Kueue](https://github.com/kubernetes-sigs/kueue), which adds job queues and GPU quotas to Kubernetes. I'll look at which add-on does what, how GPUs and NVLink topology (NVLink is introduced in [Part 1](@/ai-lab/01-intro/index.md#what-the-lab-is-made-of)) show up as Kubernetes objects, run the same jobs as pods, and see how Kueue queues them.
 
-To switch, set `scheduler: k3s` in `inventory/group_vars/all.yml`, then run `make down && make up` ([Part 1](@/ai-lab/01-intro/index.md#setup)). Commands prefixed with `$` run on the login node as `joe` (`bin/ssh login`), whose kubeconfig and namespace are already set up. `bin/kubectl` runs `kubectl` from the repository root on the host with the cluster-admin kubeconfig; commands that need admin rights use it.
+To switch, set `scheduler: k3s` in `inventory/group_vars/all.yml`, then run `make down && make up` ([Part 1](@/ai-lab/01-intro/index.md#setup)). Commands that start with `bin/` run on the host, from the repository root. All other commands run on the login node as `joe` (`bin/ssh login`), whose kubeconfig and namespace are already set up. `bin/kubectl` runs `kubectl` on the host with the cluster-admin kubeconfig; commands that need admin rights use it.
 
 ## What Kubernetes sees
 
@@ -182,11 +182,15 @@ No pods are created while the workload is suspended, so nothing sits half-schedu
 
 ### Cordoning a tray
 
-Cordoning marks a node unschedulable while leaving its running pods alone, the Kubernetes counterpart of a Slurm drain. It's the Kubernetes half of the power-cycle runbook from [Part 4](@/ai-lab/04-bmc-redfish/index.md):
+Cordoning marks a node unschedulable while leaving its running pods alone, the Kubernetes counterpart of a Slurm drain. It's the Kubernetes half of the power-cycle runbook from [Part 4](@/ai-lab/04-bmc-redfish/index.md). Cordoning needs admin rights, so it runs on the host:
 
 ```console
 $ bin/kubectl cordon sched-worker2
+```
 
+Then, as `joe` on the login node, submit `nvl8-hello` and ask Kueue why it waits:
+
+```console
 $ ./submit nvl8-hello.yaml
 nvl8-hello-664894
 
@@ -200,18 +204,31 @@ Kueue sees that only one tray's worth of GPUs is schedulable inside the domain a
 
 Cluster state reaches Prometheus through kube-state-metrics (NodePort 30808): nodes and their allocatable GPUs, pods' GPU requests, Jobs and their status. Recording rules turn it into the same `sched_*` series that Slurm's exporter feeds in Part 2 (GPUs allocated, GPUs per user, jobs and nodes by state), so the Grafana dashboards don't need to know which scheduler is running. With a 60,000-step DDP run holding all 8 GPUs and `nvl8-hello` queued behind it:
 
-- GPUs allocated, `8`:\
-  `sched_gpus_alloc`
-- GPUs per user, 8 for `joe`:\
-  `sched_user_gpus`
-- Jobs that haven't completed, one running and one pending:\
-  `sched_jobs{state!="COMPLETED"}`
-- Nodes ready, `2`:\
-  `sched_nodes`
-- GPU utilisation per tray, `3.48` (4 GPUs × ~87 %):\
-  `sum by (instance) (nvidia_smi_utilization_gpu_ratio)`
-- Processes on GPUs, `4` per tray:\
-  `sum by (instance) (nvidia_smi_compute_apps)`
+```
+# GPUs allocated
+sched_gpus_alloc
+8
+
+# GPUs per user
+sched_user_gpus
+{namespace="joe", user="joe"} 8
+
+# jobs that haven't completed
+sched_jobs{state!="COMPLETED"}
+RUNNING 1, PENDING 1
+
+# nodes by state
+sched_nodes
+READY 2
+
+# GPU utilisation per tray (4 GPUs × ~87 %)
+sum by (instance) (nvidia_smi_utilization_gpu_ratio)
+3.48 per tray
+
+# processes on GPUs
+sum by (instance) (nvidia_smi_compute_apps)
+4 per tray
+```
 
 A Job that Kueue keeps suspended counts as `PENDING`, so the queue is visible next to the allocation. In Grafana's *Scheduler & NVLink fabric* dashboard it shows up as a stacked band under the running job:
 

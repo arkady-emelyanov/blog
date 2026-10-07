@@ -13,7 +13,7 @@ local_image = "ai-lab/02-slurm/card.png"
 
 I'll look at how Slurm is configured for GPUs, run jobs from a one-liner up to PyTorch DDP across both trays, do some routine operations, and watch it all in Prometheus.
 
-Commands prefixed with `$` run on the login node as `joe`, the lab's regular user from [Part 1](@/ai-lab/01-intro/index.md#first-contact) (`bin/ssh login`). Commands that start with `bin/` run from the repository root on the host.
+Commands that start with `bin/` run on the host, from the repository root. All other commands run on the login node as `joe`, the lab's regular user from [Part 1](@/ai-lab/01-intro/index.md#first-contact); `bin/ssh login` gets you there.
 
 ## What Slurm sees
 
@@ -188,12 +188,12 @@ GPU-hour reports and chargeback are built on this data.
 
 ### Draining a node for maintenance
 
-Draining tells Slurm to let running jobs finish but start no new ones on the node, so you can work on it without killing anyone's job. Run these as root on the controller (`bin/ssh sched-control`):
+Draining tells Slurm to let running jobs finish but start no new ones on the node, so you can work on it without killing anyone's job. Admin commands run as root on the controller, so run them from the host through `bin/ssh sched-control`:
 
 ```console
-# scontrol update nodename=sched-worker2 state=drain reason="maintenance: BMC firmware"
+$ bin/ssh sched-control 'scontrol update nodename=sched-worker2 state=drain reason="maintenance: BMC firmware"'
 
-# sinfo -R
+$ bin/ssh sched-control sinfo -R
 REASON               USER      TIMESTAMP           NODELIST
 maintenance: BMC fir root      2026-10-05T19:31:07 sched-worker2
 ```
@@ -210,15 +210,19 @@ JOBID PARTITION     NAME     USER ST  TIME  NODES NODELIST(REASON)
 
 The partitions in that message are **Slurm partitions**, not NVLink ones. A Slurm partition is a named group of nodes that jobs are submitted to, much like a queue; the lab has one, `gpu`.
 
-`scontrol update nodename=sched-worker2 state=resume` brings the node back, and job 17 runs within seconds. In [Part 4](@/ai-lab/04-bmc-redfish/index.md) I power-cycle a tray through its BMC, which is the other half of this runbook.
+`bin/ssh sched-control scontrol update nodename=sched-worker2 state=resume` brings the node back, and job 17 runs within seconds. In [Part 4](@/ai-lab/04-bmc-redfish/index.md) I power-cycle a tray through its BMC, which is the other half of this runbook.
 
 ### GPU quotas
 
-Limits live on associations. Cap `joe` at four GPUs:
+Limits live on associations. Cap `joe` at four GPUs, on the host:
 
 ```console
-# sacctmgr -i modify user joe set GrpTRES=gres/gpu=4
+$ bin/ssh sched-control sacctmgr -i modify user joe set GrpTRES=gres/gpu=4
+```
 
+Then, as `joe` on the login node, submit an 8-GPU job and a 4-GPU job:
+
+```console
 $ sbatch -J big -N2 --gpus-per-node=4 --wrap "sleep 5"
 
 $ sbatch -J small -N1 --gpus-per-node=4 --wrap "sleep 5"
@@ -254,16 +258,27 @@ Prometheus (`http://10.107.111.10:9090`) collects the same GPU values through th
 
 Here are some of them while the DDP job runs, with `nvl8-hello` submitted after it and waiting for free GPUs:
 
-- GPUs allocated, `8`:\
-  `sched_gpus_alloc`
-- GPUs per user, 8 for `joe`:\
-  `sched_user_gpus`
-- Jobs by state, one running and one pending:\
-  `sched_jobs`
-- GPU utilisation per tray, `3.32` and `3.38` (4 GPUs × ~80 %):\
-  `sum by (instance) (nvidia_smi_utilization_gpu_ratio)`
-- All-reduce traffic over NVLink, about 3.4 TB/s:\
-  `sum(rate(nvlink_gpu_tx_bytes_total[1m]))`
+```
+# GPUs allocated
+sched_gpus_alloc
+8
+
+# GPUs per user
+sched_user_gpus
+{user="joe"} 8
+
+# jobs by state
+sched_jobs
+RUNNING 1, PENDING 1
+
+# GPU utilisation per tray (4 GPUs × ~80 %)
+sum by (instance) (nvidia_smi_utilization_gpu_ratio)
+3.32, 3.38
+
+# all-reduce traffic over NVLink
+sum(rate(nvlink_gpu_tx_bytes_total[1m]))
+~3.4 TB/s
+```
 
 ### Lab overview dashboard
 
@@ -273,10 +288,10 @@ Open Grafana (`http://10.107.111.10:3000`) and the **Lab overview** dashboard:
 
 All eight GPUs move together:
 
-- **GPU utilisation** jumps to 80–85 % when the job starts and drops to 0 when it ends.
+- **GPU utilisation** jumps to about 87 % when the job starts and drops to 0 when it ends.
 - **GPU memory used** goes to about 7 GiB per GPU and stays there until the job ends.
-- **GPU power** goes from about 140 W to 810–870 W per GPU.
-- **GPU temperature** climbs to 67–68 °C over about a minute and cools slowly after the job.
+- **GPU power** goes from about 140 W to 870–900 W per GPU.
+- **GPU temperature** climbs to 69–70 °C over about a minute. When the job ends, it drops straight back to idle: the epilog resets the job's GPUs ([Part 8](@/ai-lab/08-gpu-handover/index.md)).
 - **Processes on GPUs** shows 4 per tray, one per GPU.
 - **NVL8 domain power** is the total for all eight GPUs: about 7 kW.
 

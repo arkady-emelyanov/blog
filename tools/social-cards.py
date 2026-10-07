@@ -61,6 +61,9 @@ CARDS = [
     dict(file="07-networking", part=7,
          chips=["InfiniBand topology", "front-end Ethernet", "no RDMA · no DPUs"],
          focus={IB}, label="scale-out: leaf · spine"),
+    dict(file="08-gpu-handover", part=8,
+         chips=["nvidia-smi --gpu-reset", "Slurm epilog", "GPU_RESET"],
+         focus={GPUS}, label="reset between tenants"),
 ]
 PARTS = max(c["part"] for c in CARDS)
 

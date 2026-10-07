@@ -70,18 +70,31 @@ sched-worker2  3    18/18   9           9
 
 ## Health: a degraded GPU
 
-Remember the two NVLinks disabled through the tray BMC in Part 4? With them down, the lab's controller rates that GPU as degraded:
+Disable two of GPU 2's links on `sched-worker1` from the switch side, through the switch tray's BMC as in [Part 4](@/ai-lab/04-bmc-redfish/index.md). Ports 19 and 20 on `NVSwitch_0` are that GPU's links 2 and 4. With them down, the lab's controller rates the GPU as degraded:
 
 ```console
+$ for p in 19 20; do
+    bin/redfish sched-nvswitch /redfish/v1/Fabrics/MGX_NVLinkFabric_0/Switches/NVSwitch_0/Ports/NVLink_$p \
+      -X PATCH -d '{"LinkState": "Disabled"}'
+  done
+
 $ bin/nvlink gpus sched-worker1
-TRAY           GPU  UUID                                      PARTITION  CLIQUE  NVLINKS  HEALTH
-sched-worker1  0    GPU-81501924-f170-f6d0-f2da-dc7595876881  32766      1       18       healthy
-sched-worker1  1    GPU-8150a4ae-478e-5534-f66c-621a95f85f59  32766      1       18       healthy
-sched-worker1  2    GPU-81502f39-9cad-de97-2723-3d7d71928458  32766      1       16       degraded
-sched-worker1  3    GPU-8151bac3-f1cc-3cd0-015f-475439ee933a  32766      1       18       healthy
+TRAY           GPU  UUID                                      PARTITION  CLIQUE  RESET  NVLINKS  HEALTH
+sched-worker1  0    GPU-81501924-f170-f6d0-f2da-dc7595876881  32766      1       -      18       healthy
+sched-worker1  1    GPU-8150a4ae-478e-5534-f66c-621a95f85f59  32766      1       -      18       healthy
+sched-worker1  2    GPU-81502f39-9cad-de97-2723-3d7d71928458  32766      1       -      16       degraded
+sched-worker1  3    GPU-8151bac3-f1cc-3cd0-015f-475439ee933a  32766      1       -      18       healthy
 ```
 
-The same appears in metrics as `nvlink_gpu_active_links{host="sched-worker1",gpu="2"} 16` and `nvlink_gpu_healthy{…} 0`. `min(nvlink_gpu_healthy) == 0` makes a natural first alert.
+The same appears in the controller's metrics:
+
+```console
+$ curl -s http://10.107.111.34:9372/metrics | grep -E '^nvlink_gpu_(active_links|healthy)\{.*host="sched-worker1"' | grep 'gpu="2"'
+nvlink_gpu_active_links{gpu="2",host="sched-worker1",slot="1",uuid="GPU-81502f39-9cad-de97-2723-3d7d71928458"} 16
+nvlink_gpu_healthy{gpu="2",host="sched-worker1",slot="1",uuid="GPU-81502f39-9cad-de97-2723-3d7d71928458"} 0
+```
+
+`min(nvlink_gpu_healthy) == 0` makes a natural first alert. Set both ports back to `"Enabled"` to restore the GPU.
 
 `degraded` (`NMX_GPU_HEALTH_DEGRADED_BANDWIDTH` in the API) is the lab's rating for a GPU with some links down. NVIDIA's [GB200 NVL Partition User's Guide](https://docs.nvidia.com/multi-node-nvlink-systems/partition-guide-v1-2.pdf) (§6.2) documents an access-link failure as marking the GPU `NO_NVLINK`, with the partition's workload running into errors, and the real health enum also has a `DEGRADED_BW` value.
 
@@ -99,31 +112,50 @@ Take the tray out of the default partition first:
 ```console
 $ bin/nvlink remove default sched-worker2
 GPUs removed: 32766 default
+sched-worker2: GPUs 0,1,2,3 keep their old clique until reset: bin/ssh sched-worker2 nvidia-smi --gpu-reset -i 0,1,2,3  (GPUs must be idle; with Slurm the epilog resets a job's GPUs when it ends)
 
 $ bin/nvlink partitions
 ID     NAME     GPUS  STATE   HEALTH   MEMBERS
 32766  default  4     ACTIVE  healthy  sched-worker1:0-3
 
 in no partition: sched-worker2:0-3
-
-$ bin/ssh sched-worker2 nvidia-smi --query-gpu=index,fabric.cliqueId --format=csv
-index, fabric.clique_id
-0, 0
-1, 0
-2, 0
-3, 0
 ```
 
-Clique `0` means the GPU is in no partition. On real hardware that GPU now has no NVLink peers at all. Create the new partition:
+`bin/nvlink` warns that the GPUs keep their old clique until they're reset. As on GB200, a GPU takes a new partition only at a GPU reset or a reboot; [Part 8](@/ai-lab/08-gpu-handover/index.md) explains why. So NVML still reports clique 1:
+
+```console
+$ bin/ssh sched-worker2 nvidia-smi --query-gpu=index,fabric.cliqueId --format=csv
+index, fabric.clique_id
+0, 1
+1, 1
+2, 1
+3, 1
+```
+
+Create the new partition. The GPUs belong to it now, but their reset is still pending:
 
 ```console
 $ bin/nvlink create tray2 --id 7 sched-worker2
 partition created: 7 tray2
+sched-worker2: GPUs 0,1,2,3 keep their old clique until reset: bin/ssh sched-worker2 nvidia-smi --gpu-reset -i 0,1,2,3  (GPUs must be idle; with Slurm the epilog resets a job's GPUs when it ends)
 
-$ bin/nvlink partitions
-ID     NAME     GPUS  STATE   HEALTH   MEMBERS
-7      tray2    4     ACTIVE  healthy  sched-worker2:0-3
-32766  default  4     ACTIVE  healthy  sched-worker1:0-3
+$ bin/nvlink gpus sched-worker2
+TRAY           GPU  UUID                                      PARTITION  CLIQUE  RESET    NVLINKS  HEALTH
+sched-worker2  0    GPU-81477906-d580-de42-e868-ff62e9ef4317  7          1       pending  18       healthy
+sched-worker2  1    GPU-8147ef90-7f0c-fc1e-c070-d80c4a3d939f  7          1       pending  18       healthy
+sched-worker2  2    GPU-81488ef0-5668-4b3a-b971-f8fb582a0fb2  7          1       pending  18       healthy
+sched-worker2  3    GPU-814804a5-291e-ba91-a4e9-01fb69ea739b  7          1       pending  18       healthy
+```
+
+Reset the tray's GPUs. They have to be idle, and the reset needs root:
+
+```console
+$ bin/ssh sched-worker2 nvidia-smi --gpu-reset
+GPU 00000000:18:00.0 was successfully reset.
+GPU 00000000:2A:00.0 was successfully reset.
+GPU 00000000:3A:00.0 was successfully reset.
+GPU 00000000:5D:00.0 was successfully reset.
+All done.
 
 $ bin/ssh sched-worker2 nvidia-smi --query-gpu=index,fabric.cliqueId --format=csv
 index, fabric.clique_id
@@ -135,13 +167,13 @@ index, fabric.clique_id
 
 ### How the scheduler finds out
 
-Nobody tells Slurm about this directly. Every minute, topograph on the controller collects `ibnetdiscover` and the NVML clique from every tray, and regenerates `topology.conf` when the result changes. I polled `scontrol show topology` every 10 seconds after creating the partition, and the change landed about 60 seconds later:
+Nobody tells Slurm about this directly. Every minute, topograph on the controller collects `ibnetdiscover` and the NVML clique from every tray, and regenerates `topology.conf` when the result changes. It reads the clique from NVML, so it only sees the change after the reset. I polled `scontrol show topology` every 10 seconds after the reset, and the change landed about a minute later:
 
 ```
-12:38:21  partition 7 created
-12:38:31  BlockName=block001 BlockIndex=0 Nodes=sched-worker[1-2]
+20:03:36  GPUs reset
+20:03:36  BlockName=block001 BlockIndex=0 Nodes=sched-worker[1-2]
 …
-12:39:23  BlockName=block001 BlockIndex=0 Nodes=sched-worker1
+20:04:38  BlockName=block001 BlockIndex=0 Nodes=sched-worker1
           BlockName=block002 BlockIndex=1 Nodes=sched-worker2
 ```
 
@@ -164,11 +196,11 @@ Each block is named after the cluster UUID and clique it was built from. In Kube
 You might expect `nvl8-hello` (2 nodes × 4 GPUs) to wait now. It doesn't:
 
 ```console
-$ sbatch --wait nvl8-hello.sbatch && cat nvl8-hello-21.out
-job 21 on sched-worker[1-2]: 8 tasks
-0: rank 0 on sched-worker1 CUDA_VISIBLE_DEVICES=0: NVIDIA GB200, GPU-81501924-…, 1, scratch  198G
+$ sbatch --wait nvl8-hello.sbatch && cat nvl8-hello-28.out
+job 28 on sched-worker[1-2]: 8 tasks
+0: rank 0 on sched-worker1 CUDA_VISIBLE_DEVICES=0: NVIDIA GB200, GPU-81501924-f170-f6d0-f2da-dc7595876881, 1, scratch  198G
 …
-4: rank 4 on sched-worker2 CUDA_VISIBLE_DEVICES=0: NVIDIA GB200, GPU-81477906-…, 7, scratch  198G
+4: rank 4 on sched-worker2 CUDA_VISIBLE_DEVICES=0: NVIDIA GB200, GPU-81477906-d580-de42-e868-ff62e9ef4317, 7, scratch  198G
 …
 ```
 
@@ -178,14 +210,23 @@ On real hardware, the two halves of this job would talk over the network instead
 
 Kubernetes behaves differently. The lab's JobSets require all pods to be in one NVLink domain (`kueue.x-k8s.io/podset-required-topology`), so Kueue keeps the same job waiting instead of splitting it. Slurm runs the job split, Kueue doesn't run it at all. Which is better depends on the job.
 
-Merge back by deleting the partition, which leaves its GPUs in no partition, and adding the tray to the default partition again. The default block returns within a minute:
+Merge back by deleting the partition, adding the tray to the default partition again, and resetting its GPUs. The default block returns within a minute:
 
 ```console
 $ bin/nvlink delete tray2
 partition deleted; its GPUs are in no partition
+sched-worker2: GPUs 0,1,2,3 keep their old clique until reset: bin/ssh sched-worker2 nvidia-smi --gpu-reset -i 0,1,2,3  (GPUs must be idle; with Slurm the epilog resets a job's GPUs when it ends)
 
 $ bin/nvlink add default sched-worker2
 GPUs added: 32766 default
+sched-worker2: GPUs 0,1,2,3 keep their old clique until reset: bin/ssh sched-worker2 nvidia-smi --gpu-reset -i 0,1,2,3  (GPUs must be idle; with Slurm the epilog resets a job's GPUs when it ends)
+
+$ bin/ssh sched-worker2 nvidia-smi --gpu-reset
+GPU 00000000:18:00.0 was successfully reset.
+GPU 00000000:2A:00.0 was successfully reset.
+GPU 00000000:3A:00.0 was successfully reset.
+GPU 00000000:5D:00.0 was successfully reset.
+All done.
 
 $ bin/nvlink partitions
 ID     NAME     GPUS  STATE   HEALTH   MEMBERS
@@ -206,14 +247,23 @@ nvswitch_ports_up{host="sched-nvswitch",switch="NVSwitch_1"} 72
 
 With the 8-GPU DDP job from [Part 2](@/ai-lab/02-slurm/index.md) running (`sbatch ddp-train.sbatch --steps 60000`), Prometheus shows the all-reduce traffic:
 
-- NVLink traffic from each tray, about 1.68 TB/s:\
-  `sum by (host) (rate(nvlink_gpu_tx_bytes_total[1m]))`
-- Traffic per NVSwitch chip, also about 1.68 TB/s, because each GPU spreads its links over both chips:\
-  `rate(nvswitch_tx_bytes_total[1m])`
-- Switch ports down, `0`:\
-  `sum(nvswitch_ports) - sum(nvswitch_ports_up)`
-- All GPUs healthy, `1`:\
-  `min(nvlink_gpu_healthy)`
+```
+# NVLink traffic from each tray
+sum by (host) (rate(nvlink_gpu_tx_bytes_total[1m]))
+~1.68 TB/s per tray
+
+# traffic per NVSwitch chip (each GPU spreads its links over both)
+rate(nvswitch_tx_bytes_total[1m])
+~1.68 TB/s per chip
+
+# switch ports down
+sum(nvswitch_ports) - sum(nvswitch_ports_up)
+0
+
+# all GPUs healthy
+min(nvlink_gpu_healthy)
+1
+```
 
 The Grafana dashboard **Scheduler & NVLink fabric** puts these next to the scheduler panels: unhealthy GPUs, switch ports down, GPUs per partition, and NVLink and NVSwitch throughput. Disable a switch port as in Part 4 while DDP runs, and the *switch ports down* panel and the GPU's active-link count change within one scrape.
 

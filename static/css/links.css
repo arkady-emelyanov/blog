@@ -27,3 +27,24 @@ section.body a[href^="https://linuxcontainers.org/"]::before {
 section.body a[href^="https://docs.nvidia.com/"]::before {
   background-image: url("../icons/nvidia.png");
 }
+
+/* tabi draws its hover highlight with a link's ::before (absolute, behind
+   the text, in the accent colour), which hid the icon on hover. Keep the
+   icon in place; the link itself still gets tabi's hover background. */
+section.body a[href^="https://github.com/"]:hover::before,
+section.body a[href^="https://linuxcontainers.org/"]:hover::before,
+section.body a[href^="https://docs.nvidia.com/"]:hover::before {
+  position: static;
+  z-index: auto;
+  inset: auto;
+  max-inline-size: none;
+}
+
+section.body a[href^="https://linuxcontainers.org/"]:hover::before,
+section.body a[href^="https://docs.nvidia.com/"]:hover::before {
+  background-color: transparent;
+}
+
+section.body a[href^="https://github.com/"]:hover::before {
+  background-color: currentColor;
+}

@@ -37,10 +37,15 @@ eth0@if355       UP             10.107.111.21/24 metric 100 …
 
 The rendezvous is a handful of small messages. The training traffic itself, the gradients exchanged in every all-reduce, never touches the Ethernet side (`eth0` and the pod network on top of it). With the 8-GPU DDP job running ([Part 6](@/ai-lab/06-observability/index.md)), Prometheus showed:
 
-- Ethernet traffic from each tray, about 6 KB/s:\
-  `rate(node_network_transmit_bytes_total{device="eth0", instance=~"sched-worker.*"}[1m])`
-- NVLink traffic from each tray, about 1.76 TB/s:\
-  `sum by (host) (rate(nvlink_gpu_tx_bytes_total[1m]))`
+```
+# Ethernet traffic from each tray
+rate(node_network_transmit_bytes_total{device="eth0", instance=~"sched-worker.*"}[1m])
+~6 KB/s per tray
+
+# NVLink traffic from each tray
+sum by (host) (rate(nvlink_gpu_tx_bytes_total[1m]))
+~1.76 TB/s per tray
+```
 
 A real cluster wired like the lab would show the same split. Both trays are in one NVLink domain, so a real NCCL would route the all-reduce over NVLink as well. The compute fabric only carries GPU traffic *between* NVLink domains, and the lab has only one.
 
@@ -104,4 +109,6 @@ What the lab doesn't model:
 - Exercise the **front-end network**: storage throughput on JuiceFS, the Kubernetes pod network and its DNS, LDAP and S3 from jobs.
 - Make **wrong assumptions fail cheaply**. If your tooling expects `/sys/class/infiniband` or `ibstat`, the lab tells you right away, and that's a reminder to test that part on real hardware.
 
-That's the series. The lab is at [github.com/arkady-emelyanov/ai-lab](https://github.com/arkady-emelyanov/ai-lab), and issues and pull requests are welcome.
+## Next in the series
+
+[Part 8: GPU handover](@/ai-lab/08-gpu-handover/index.md) covers what happens to a GPU between tenants: the reset that clears it and applies a new NVLink partition, and how Slurm runs it after every job.
