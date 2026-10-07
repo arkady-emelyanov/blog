@@ -1,5 +1,5 @@
 +++
-title = "AI lab, part 5: NVLink partitions, fabric health and telemetry"
+title = "AI lab, part 5: NVLink partitions"
 date = 2026-10-02
 description = "NVLink partitions, fabric health and telemetry, and how a partition change reaches the scheduler."
 
@@ -9,7 +9,9 @@ social_media_card = "card.png"
 local_image = "ai-lab/05-nvlink/card.png"
 +++
 
-[Part 4](@/ai-lab/04-bmc-redfish/index.md) broke individual NVLinks through the BMCs. This part steps back to the whole fabric. I'll cover what an NVLink domain and its partitions are, how to query and change them through the lab's partition controller, how a partition change ends up in the scheduler, and what the fabric looks like in Prometheus. The examples run in Slurm mode; the Kubernetes counterpart is noted where it differs.
+## Overview
+
+[Part 4](@/ai-lab/04-bmc-redfish/index.md) broke individual NVLinks through the BMCs. This part steps back to the whole fabric. I'll explain what an NVLink domain and its partitions are, then show how to query and change them through the lab's partition controller, how a partition change reaches the scheduler, and what the fabric looks like in Prometheus. The examples run in Slurm mode; the Kubernetes counterpart is noted where it differs.
 
 ## The concepts
 
@@ -19,7 +21,15 @@ A domain is usually shared, so the switch trays can cut it into **partitions**, 
 
 Schedulers care because a job whose ranks sit in different partitions can't use NVLink between them. The scheduler therefore needs to know the partition layout and keep jobs inside one partition. Partitions are configured on the switch side, not in the scheduler, so the layout has to be passed along. Most of this post is about how that happens.
 
-In the lab, the domain is 8 GPUs, the switch tray has two NVSwitch chips with 72 ports each, and `sched-nvswitch` runs `fakenmxc`, an NMX-C-style controller. It speaks gRPC on port 9370 (with its own `.proto`, since NVIDIA's is proprietary) and serves fabric metrics on port 9372.
+{% <admonition type="note" title="Partitions smaller than a tray"> %}
+A partition can hold part of a tray, down to a single GPU. NVML and the tray BMC report that per GPU, but the schedulers can't use it: a Slurm block and Kubernetes labels are per node. topograph, the tool that passes partitions to the scheduler (more on it below), keeps one NVLink domain per node ([`HostInfo`](https://github.com/dsx-ai-factory/topograph/blob/03cde87/pkg/topology/domain.go)). When a node's GPUs report two cliques, its run fails with "ambiguous NVL partition IDs" ([`ParseNvidiaSMIOutput`](https://github.com/dsx-ai-factory/topograph/blob/03cde87/pkg/accelerator/nvidia_smi.go)), and the last good topology stays in place without any other warning. Keep partitions to whole trays.
+{% </admonition> %}
+
+In the lab, the domain is 8 GPUs, and the switch tray has two NVSwitch chips with 72 ports each. `sched-nvswitch` runs `fakenmxc`, an NMX-C-style controller. It speaks gRPC on port 9370 and serves fabric metrics on port 9372.
+
+{% <admonition type="note" title="The controller's API"> %}
+NVIDIA's `.proto` for NMX-C is proprietary, so `fakenmxc` has its own, and tools written against it need a different client for a real NMX-C. The behaviour follows NVIDIA's [GB200 NVL Partition User's Guide](https://docs.nvidia.com/multi-node-nvlink-systems/partition-guide-v1-2.pdf): the same partition operations (create, delete, add and remove GPUs), the default partition 32766, and a GPU reset after a partition change. The status codes for errors, such as `NMX_ST_GPU_IN_USE`, are the lab's own: the guide only names success and two control-plane errors.
+{% </admonition> %}
 
 ## Looking at the fabric
 
@@ -68,9 +78,9 @@ sched-worker2  3    18/18   9           9
 
 `bin/nvlink` is a thin client over the controller's gRPC API: `--json` prints the raw responses, and `bin/grpcurl -plaintext 10.107.111.34:9370 describe nmxlab.v1.NMXController` lists every RPC.
 
-## Health: a degraded GPU
+## Health: a GPU with links down
 
-Disable two of GPU 2's links on `sched-worker1` from the switch side, through the switch tray's BMC as in [Part 4](@/ai-lab/04-bmc-redfish/index.md). Ports 19 and 20 on `NVSwitch_0` are that GPU's links 2 and 4. With them down, the lab's controller rates the GPU as degraded:
+Disable two of GPU 2's links on `sched-worker1` from the switch side, through the switch tray's BMC as in [Part 4](@/ai-lab/04-bmc-redfish/index.md). Ports 19 and 20 on `NVSwitch_0` are that GPU's links 2 and 4. With them down, the controller marks the GPU `no-nvlink`:
 
 ```console
 $ for p in 19 20; do
@@ -82,7 +92,7 @@ $ bin/nvlink gpus sched-worker1
 TRAY           GPU  UUID                                      PARTITION  CLIQUE  RESET  NVLINKS  HEALTH
 sched-worker1  0    GPU-81501924-f170-f6d0-f2da-dc7595876881  32766      1       -      18       healthy
 sched-worker1  1    GPU-8150a4ae-478e-5534-f66c-621a95f85f59  32766      1       -      18       healthy
-sched-worker1  2    GPU-81502f39-9cad-de97-2723-3d7d71928458  32766      1       -      16       degraded
+sched-worker1  2    GPU-81502f39-9cad-de97-2723-3d7d71928458  32766      1       -      16       no-nvlink
 sched-worker1  3    GPU-8151bac3-f1cc-3cd0-015f-475439ee933a  32766      1       -      18       healthy
 ```
 
@@ -94,9 +104,15 @@ nvlink_gpu_active_links{gpu="2",host="sched-worker1",slot="1",uuid="GPU-81502f39
 nvlink_gpu_healthy{gpu="2",host="sched-worker1",slot="1",uuid="GPU-81502f39-9cad-de97-2723-3d7d71928458"} 0
 ```
 
-`min(nvlink_gpu_healthy) == 0` makes a natural first alert. Set both ports back to `"Enabled"` to restore the GPU.
+`no-nvlink` is `NMX_GPU_HEALTH_NO_NVLINK` in the API. It follows NVIDIA's partition guide (§6.2, Access Link): when an access link between a GPU and an NVSwitch fails, the controller marks the GPU `NO_NVLINK`, and on real hardware the workload in its partition runs into errors. The partition itself stays healthy, as the guide describes:
 
-`degraded` (`NMX_GPU_HEALTH_DEGRADED_BANDWIDTH` in the API) is the lab's rating for a GPU with some links down. NVIDIA's [GB200 NVL Partition User's Guide](https://docs.nvidia.com/multi-node-nvlink-systems/partition-guide-v1-2.pdf) (§6.2) documents an access-link failure as marking the GPU `NO_NVLINK`, with the partition's workload running into errors, and the real health enum also has a `DEGRADED_BW` value.
+```console
+$ bin/nvlink partitions
+ID     NAME     GPUS  STATE   HEALTH   MEMBERS
+32766  default  8     ACTIVE  healthy  sched-worker1:0-3 sched-worker2:0-3
+```
+
+`min(nvlink_gpu_healthy) == 0` makes a natural first alert. Set both ports back to `"Enabled"` to restore the GPU.
 
 ## Operations: split the domain
 
@@ -187,10 +203,6 @@ BlockName=block002 Nodes=sched-worker2
 
 Each block is named after the cluster UUID and clique it was built from. In Kubernetes mode the same pipeline relabels the nodes instead (`accelerator.topograph.run/domain=<uuid>.<clique>`, plus GPU Feature Discovery's `nvidia.com/gpu.clique`). [Part 3](@/ai-lab/03-kubernetes/index.md) shows those labels.
 
-{% <admonition type="note" title="Partitions smaller than a tray"> %}
-`bin/nvlink` also takes single GPUs (`sched-worker1:2`, `sched-worker1:2-3`), so a partition can hold part of a tray, down to one GPU. NVML and the tray BMC follow that per GPU, but the schedulers can't use it. topograph keeps one NVLink domain per node ([`HostInfo`](https://github.com/dsx-ai-factory/topograph/blob/03cde87/pkg/topology/domain.go)), because a Slurm block and Kubernetes labels are per node. When a node's GPUs report two cliques, its run fails with "ambiguous NVL partition IDs" ([`ParseNvidiaSMIOutput`](https://github.com/dsx-ai-factory/topograph/blob/03cde87/pkg/accelerator/nvidia_smi.go)), and the last good topology stays in place without any other warning. Keep partitions to whole trays.
-{% </admonition> %}
-
 ### The surprise: an 8-GPU job still runs
 
 You might expect `nvl8-hello` (2 nodes × 4 GPUs) to wait now. It doesn't:
@@ -204,7 +216,7 @@ job 28 on sched-worker[1-2]: 8 tasks
 …
 ```
 
-Ranks 0–3 are in clique 1 and ranks 4–7 in clique 7. Slurm's `topology/block` *prefers* to keep a job inside one block, but a job larger than any block is allowed to span several. Newer Slurm versions can control this (`--segment`, `BlockSizes`), but the lab runs Slurm 23.11, which can't.
+Ranks 0 to 3 are in clique 1 and ranks 4-7 in clique 7. Slurm's `topology/block` *prefers* to keep a job inside one block, but a job larger than any block is allowed to span several. Newer Slurm versions can control this (`--segment`, `BlockSizes`), but the lab runs Slurm 23.11, which can't.
 
 On real hardware, the two halves of this job would talk over the network instead of NVLink, and the job would run slower. The lab doesn't show that: its emulated NCCL ignores cliques, so the job runs at the same speed.
 

@@ -9,6 +9,8 @@ social_media_card = "card.png"
 local_image = "ai-lab/01-intro/card.png"
 +++
 
+## Overview
+
 Most of the work in AI infrastructure isn't the GPUs. It's everything around them: the scheduler that places an 8-GPU job inside one NVLink domain, the BMC you power-cycle a tray through at 3 a.m., the dashboard that shows which user is holding 6 of the 8 GPUs, the runbook for a degraded NVLink. Systems engineers who want to learn this hit a wall quickly: you can't practise on a GB200 rack you don't have, and cloud GPU instances hide exactly the layers you want to touch.
 
 Most of those layers never use a GPU for computation. Slurm reads a GPU count from its configuration and sets `CUDA_VISIBLE_DEVICES` for each job. The monitoring exporter calls NVML, NVIDIA's management library. The BMC answers Redfish requests over HTTPS. All of that works against GPUs that answer the right API calls, whether or not they compute anything.
@@ -21,17 +23,17 @@ Most of those layers never use a GPU for computation. Slurm reads a GPU count fr
 
 The hardware side is one NVIDIA GB200-class **NVL8** NVLink domain. [NVLink](https://www.nvidia.com/en-us/data-center/nvlink/) is NVIDIA's GPU-to-GPU interconnect, and an NVLink domain is a set of GPUs that can all reach each other over it, even across trays, without going through the network. It's the unit a scheduler has to respect when it places a multi-GPU job. The lab's domain has:
 
-- 2x GPU compute trays with 4x GB200 GPUs each,
-- an NVLink switch tray with two NVSwitch chips (144 ports),
-- a Redfish BMC for every tray,
-- an InfiniBand fabric (one leaf, one spine).
+- 2x GPU compute trays with 4x GB200 GPUs each
+- an NVLink switch tray with 2x NVSwitch chips (144 ports)
+- a Redfish BMC for every tray
+- an InfiniBand fabric with a leaf and a spine switch
 
 On top of that hardware runs the software of a real GPU cluster:
 
-- **Slurm** or **Kubernetes** (k3s with Kueue) for scheduling,
-- OpenLDAP for users,
-- a shared filesystem, per-user S3 buckets and node-local scratch for storage,
-- Prometheus and Grafana for monitoring.
+- **Slurm** or **Kubernetes** (k3s with Kueue) for scheduling
+- OpenLDAP for users
+- a shared filesystem, per-user S3 buckets and node-local scratch for storage
+- Prometheus and Grafana for monitoring
 
 Everything runs in Incus containers, set up by Ansible behind a `Makefile`. These are the same components a real cluster runs, except the Kubernetes device plugin, which the lab replaces with its own ([Part 3](@/ai-lab/03-kubernetes/index.md)).
 
@@ -41,8 +43,8 @@ Each GPU tray has `/dev/nvidia0-3` and stub versions of NVIDIA's software: the C
 
 The stubs also model timing and telemetry, because schedulers, dashboards and timeouts depend on both:
 
-- every call succeeds and takes **realistic time**: a matrix multiply takes about as long as it would on a GB200, an all-reduce as long as NVLink bandwidth allows;
-- while a job runs, the GPUs report load, memory, power and temperature that rise and fall with it.
+- Every call succeeds and takes **realistic time**: a matrix multiply takes about as long as it would on a GB200, an all-reduce as long as NVLink bandwidth allows.
+- While a job runs, the GPUs report load, memory, power and temperature that rise and fall with it.
 
 Nothing is actually computed: tensors hold zeros, so the numbers from a training run mean nothing. Everything around the numbers works: scheduling, GPU binding, accounting, monitoring, failure handling and out-of-band management.
 
@@ -64,7 +66,7 @@ Each `NV18` means the two GPUs are connected through 18 NVLinks. The matrix refl
 - **Scheduler work.** Write and test job portals, quota tools, scheduler plugins and user CLIs against a real Slurm (GRES, accounting, `topology/block`) or a real Kubernetes setup (device plugin, GPU Feature Discovery, Kueue topology-aware scheduling, JobSet).
 - **Monitoring and operations.** Build dashboards and alerts on realistic GPU, scheduler and NVLink metrics, and rehearse drains, power cycles, link failures and partition changes.
 - **Hardware management tooling.** Point Redfish clients and BMC automation at three BMCs modelled on NVIDIA's OpenBMC fork, and drive an NMX-C-style partition controller over gRPC.
-- **AI pipelines.** Run PyTorch DDP and Ray end to end on 8 GPUs to test orchestration, data movement and failure handling. The numerics are meaningless, but the plumbing is real.
+- **AI pipelines.** Run [PyTorch DDP](https://docs.pytorch.org/docs/stable/notes/ddp.html) (distributed data-parallel training) and [Ray](https://github.com/ray-project/ray) (distributed Python) end to end on 8 GPUs to test orchestration, data movement and failure handling. The numerics are meaningless, but the plumbing is real.
 - **CI for infrastructure code.** `make up && make test` builds and verifies the whole cluster from scratch.
 
 ## Requirements

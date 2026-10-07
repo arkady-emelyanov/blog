@@ -1,7 +1,7 @@
 +++
-title = "AI lab, part 7: networking, and where the emulation stops"
+title = "AI lab, part 7: Networking"
 date = 2026-10-03
-description = "The networks of a GPU cluster, what the lab emulates for each, and where the emulation stops."
+description = "The networks of a GPU cluster, and what the lab emulates for each: NVLink, InfiniBand, the front end and out-of-band management."
 
 [extra]
 social_media_card = "card.png"
@@ -9,16 +9,22 @@ social_media_card = "card.png"
 local_image = "ai-lab/07-networking/card.png"
 +++
 
+## Overview
+
 [Part 5](@/ai-lab/05-nvlink/index.md) covered NVLink, the fabric *inside* an NVLink domain. A real GPU cluster has several more networks, and this is the part of the lab that is emulated most thinly. This post goes through which networks a GB200-class system has, what the lab gives you for each, and what it doesn't model at all, so you know where its answers stop being meaningful. Outputs were captured in Kubernetes mode; the network side is the same in Slurm mode, minus the pod network.
 
 ## The networks of a GPU cluster
 
-- **NVLink** carries GPU-to-GPU traffic inside one NVLink domain. In the lab: emulated, with links, partitions, health and traffic counters ([Part 5](@/ai-lab/05-nvlink/index.md)).
-- **The compute fabric** (InfiniBand or RoCE Ethernet) carries GPU-to-GPU traffic *between* NVLink domains: the scale-out network. In the lab: **topology only**.
-- **Front-end Ethernet** carries logins, scheduler, storage, container images and everything else. In the lab: real, the Incus bridge.
+GPU-to-GPU traffic uses two networks. The **scale-up** network joins GPUs into one larger domain, so they work like a single big machine: on GB200 that's NVLink. The **scale-out** network connects those domains to each other: InfiniBand or Ethernet. Together with the networks for everything else, a GB200-class cluster has four:
+
+- **NVLink**, the scale-up network, carries GPU-to-GPU traffic inside one NVLink domain. In the lab: emulated, with links, partitions, health and traffic counters ([Part 5](@/ai-lab/05-nvlink/index.md)).
+- **The compute fabric** (InfiniBand or RoCE Ethernet), the scale-out network, carries GPU-to-GPU traffic *between* NVLink domains. In the lab: the switch topology, and traffic counters for NCCL traffic between NVLink partitions.
+- **Front-end Ethernet** carries logins, scheduler, storage and datasets, container images and everything else. Larger systems often give storage its own network, so reading datasets doesn't compete with the rest. In the lab: real, the Incus bridge.
 - **Out-of-band management** connects the BMCs. In the lab: it shares the Incus bridge.
 
-On a real rack these are separate wires. GB200 compute trays carry ConnectX adapters for the compute fabric and BlueField-3 DPUs for the front end, and the BMCs sit on their own management network. In the lab, everything that isn't NVLink runs over one Linux bridge.
+{% <admonition type="note" title="On a real rack"> %}
+These are physically separate networks, each with its own cards and cables. The lab can't emulate that: everything that isn't NVLink runs over one Linux bridge.
+{% </admonition> %}
 
 ## The front end: one bridge for everything
 
@@ -27,10 +33,11 @@ Every container has one interface on `incusbr0`. Here's a tray in Kubernetes mod
 ```console
 $ bin/ssh sched-worker1 ip -br addr
 lo               UNKNOWN        127.0.0.1/8 ::1/128
-flannel.1        UNKNOWN        10.42.2.0/32 fe80::dc1c:1fff:fe03:ee5/64
-cni0             UP             10.42.2.1/24 fe80::a806:acff:fead:4f65/64
-veth…@if2        UP             …
-eth0@if355       UP             10.107.111.21/24 metric 100 …
+flannel.1        UNKNOWN        10.42.3.0/32 fe80::187f:3dff:fe7d:ff1c/64
+cni0             UP             10.42.3.1/24 fe80::e85f:deff:feb9:d143/64
+veth18e97112@if2 UP             fe80::a85d:a8ff:feeb:a10d/64
+vethef2a26b5@if2 UP             fe80::384c:14ff:fe51:c925/64
+eth0@if101       UP             10.107.111.21/24 metric 100 fd42:7625:9911:a275:216:3eff:fea5:2b24/64 fe80::216:3eff:fea5:2b24/64
 ```
 
 `eth0` carries everything: SSH, the scheduler's control traffic, LDAP, S3 and JuiceFS, Prometheus scrapes, and the BMCs' Redfish. In Kubernetes mode `flannel.1` adds the pod network (a 10.42.x.0/24 per node) as VXLAN over the same `eth0`. That's where the DDP job's rendezvous happens: `torchrun` in pod 1 connects to pod 0 through the JobSet's DNS name ([Part 3](@/ai-lab/03-kubernetes/index.md#running-jobs)).
@@ -40,20 +47,29 @@ The rendezvous is a handful of small messages. The training traffic itself, the 
 ```
 # Ethernet traffic from each tray
 rate(node_network_transmit_bytes_total{device="eth0", instance=~"sched-worker.*"}[1m])
-~6 KB/s per tray
+5-10 KB/s per tray
 
 # NVLink traffic from each tray
 sum by (host) (rate(nvlink_gpu_tx_bytes_total[1m]))
-~1.76 TB/s per tray
+~1.75 TB/s per tray
 ```
 
-A real cluster wired like the lab would show the same split. Both trays are in one NVLink domain, so a real NCCL would route the all-reduce over NVLink as well. The compute fabric only carries GPU traffic *between* NVLink domains, and the lab has only one.
+{% <admonition type="note" title="Real hardware would do the same"> %}
+NCCL, the library that runs the all-reduce, picks the fastest path between each pair of GPUs. GPUs in the same NVLink partition reach each other over NVLink, so NCCL never uses the network for them. Here both trays are in one NVLink domain, and all eight GPUs are in its one partition, so a real cluster would also keep the whole all-reduce on NVLink. The compute fabric only gets GPU traffic when GPUs can't reach each other over NVLink: between NVLink domains, or between partitions of one domain.
+{% </admonition> %}
 
-## The compute fabric: InfiniBand as topology
+## The compute fabric: InfiniBand
 
-InfiniBand is the network most GPU clusters use between NVLink domains. It was built for HPC and offers very low latency and RDMA, which lets one machine write straight into another's memory without involving either CPU. Its switches are usually wired as a **leaf-spine** tree: hosts plug into leaf switches, and leaves connect to each other through spine switches. Each host connects through an **HCA** (host channel adapter), InfiniBand's name for a network card.
+InfiniBand is the network most GPU clusters use between NVLink domains. It was built for HPC and offers very low latency and RDMA, which lets one machine write straight into another's memory without involving either CPU. Each host connects through an **HCA** (host channel adapter), InfiniBand's name for a network card.
 
-The lab carries no InfiniBand traffic. It emulates only the part that cluster software reads: the switch topology. Each tray has an emulated `ibnetdiscover` that prints an NDR fabric with one spine, one leaf and four HCAs per tray, described in `/etc/fakeib.json`:
+The switches are usually wired in two layers, **leaf** and **spine**:
+
+- **Leaf switches** connect to the hosts: each HCA plugs into a leaf
+- **Spine switches** connect the leaves to each other: every leaf has links to every spine
+
+Traffic between two hosts on the same leaf stays on that leaf. Traffic between hosts on different leaves goes leaf, spine, leaf, so any two hosts are at most three switches apart. That's why schedulers care which leaf a node is on: a job whose nodes share a leaf has the shortest paths, and doesn't compete with other jobs for the spine links.
+
+The lab emulates two parts of InfiniBand: the switch topology that cluster software reads, and the traffic NCCL sends between NVLink partitions. Start with the topology. Each tray has an emulated `ibnetdiscover`, which prints the fabric described in `/etc/fakeib.json`:
 
 ```console
 $ bin/ssh sched-worker1 sudo ibnetdiscover
@@ -70,44 +86,43 @@ Switch	65 "S-2c5eab036832a42e"		# "MF0;LAB-IBLEAF-01:MQM9701/U1" enhanced port 0
 …
 ```
 
-Two switches, eight HCAs (`mlx5_0`–`mlx5_3` on each tray, one per GPU, 4×NDR = 400 Gb/s each), and four leaf-to-spine uplinks. The format is the real one, so the real consumer can parse it. That consumer is NVIDIA's [topograph](https://github.com/dsx-ai-factory/topograph): every minute it runs `ibnetdiscover` on the trays, combines the switch tree with the NVLink cliques from NVML, and hands the result to the scheduler. In Kubernetes mode it becomes node labels, one per tier:
+The fabric has a leaf switch and a spine switch above it. Each tray connects to the leaf with four HCAs, from `mlx5_0` to `mlx5_3`, so every GPU has its own 400 Gb/s link (4×NDR). The leaf connects to the spine over four uplinks.
+
+`ibnetdiscover` prints all this in its real format, so real tools can read it. The tool that matters here is NVIDIA's [topograph](https://github.com/dsx-ai-factory/topograph). Every minute it runs `ibnetdiscover` on the trays, combines the switch tree with the NVLink cliques from NVML, and passes the result to the scheduler. In Kubernetes mode the result becomes node labels:
 
 ```console
 $ bin/kubectl get nodes -l nvidia.com/gpu.present=true \
     -L accelerator.topograph.run/domain,fabric.topograph.run/tier-0,fabric.topograph.run/tier-1
 NAME            STATUS   ROLES    AGE    VERSION        DOMAIN                                   TIER-0               TIER-1
-sched-worker1   Ready    <none>   137m   v1.36.5+k3s1   7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91.1   S-2c5eab036832a42e   S-2c5eab0306555424
-sched-worker2   Ready    <none>   137m   v1.36.5+k3s1   7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91.1   S-2c5eab036832a42e   S-2c5eab0306555424
+sched-worker1   Ready    <none>   30m    v1.36.5+k3s1   7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91.1   S-2c5eab036832a42e   S-2c5eab0306555424
+sched-worker2   Ready    <none>   30m    v1.36.5+k3s1   7f3c2a10-5b4e-4d6a-9c1e-2b8f0e6d4a91.1   S-2c5eab036832a42e   S-2c5eab0306555424
 ```
 
-Kueue's `nvl` topology orders these as spine → leaf → NVLink domain → node, so a workload can require or prefer any of those levels; the lab's examples require one NVLink domain. In Slurm mode, topograph writes `topology.conf` instead ([Part 5](@/ai-lab/05-nvlink/index.md#how-the-scheduler-finds-out)). With one leaf and one spine, every tray shares every tier, so the switch levels never separate anything here. The emulator only knows one leaf: switch and HCA names and the HCA count are configurable (`ib_spine`, `ib_leaf`, `ib_hcas_per_node`), but a multi-leaf fabric would need changes to `fakeib` itself.
+Kueue uses these labels as levels, from the largest to the smallest: spine, leaf, NVLink domain, node. A job can ask to stay within any of them; the lab's examples ask for one NVLink domain. In Slurm mode, topograph writes the same information to `topology.conf` instead ([Part 5](@/ai-lab/05-nvlink/index.md#how-the-scheduler-finds-out)).
+
+In the lab both trays sit under the same leaf and spine, so only the NVLink level can ever separate them. The emulator can't build a fabric with more leaves.
 
 ## What isn't there
 
-The fabric exists only as `ibnetdiscover`'s output. The trays have no `/sys/class/infiniband`, no `ibstat`, no `perfquery`, and no RDMA devices:
-
-```console
-$ bin/ssh sched-worker1 ls /sys/class/infiniband
-ls: cannot access '/sys/class/infiniband': No such file or directory
-```
-
 What the lab doesn't model:
 
-- **RDMA and GPUDirect.** No verbs devices, no RDMA traffic, no GPUDirect RDMA or GPUDirect Storage. NCCL's InfiniBand transport, and anything that tunes it (`NCCL_IB_HCA`, adaptive routing, rail alignment), has nothing to act on. The emulated NCCL doesn't use a network at all.
-- **Fabric management.** No subnet manager, no UFM, no `ibdiagnet`, no port counters or link errors, so the scale-out layer of [Part 6](@/ai-lab/06-observability/index.md) has nothing to scrape. There are no partition keys either, so multi-tenant fabric isolation can't be tested.
-- **In-network computing.** No SHARP, so no switch-offloaded reductions.
-- **Ethernet compute fabrics.** No RoCE and no Spectrum-X; the compute fabric is InfiniBand-shaped only.
-- **BlueField DPUs.** No DPUs and nothing DOCA-based: no DPU-offloaded storage, networking or security, no host isolation enforced by the DPU, and no DPU BMC to manage. On real GB200 trays the front end goes through BlueField-3; in the lab it's a plain Linux interface.
-- **Separate networks.** Front end, storage, out-of-band management and the pod network all share one bridge, so "the management network is down while the cluster is fine" can't be rehearsed, and neither can a congested storage network.
-- **Scale.** One NVLink domain, one leaf, one spine. Real clusters have hundreds of leaves and the topology questions that come with them.
-- **Network faults.** There's no way to fail an InfiniBand link the way the BMCs fail an NVLink ([Part 4](@/ai-lab/04-bmc-redfish/index.md)). Network faults can only be imitated at the Linux level, for example with `tc` on the bridge.
+- **InfiniBand devices and tools.** The trays have no InfiniBand devices, so there's no `/sys/class/infiniband`, `ibstat` or `perfquery`. Only `ibnetdiscover` works, and it prints the emulated topology.
+- **RDMA and GPUDirect.** Without devices there's no RDMA, GPUDirect RDMA or GPUDirect Storage, and NCCL's InfiniBand settings, such as `NCCL_IB_HCA`, have nothing to act on. The emulated NCCL only counts the bytes it would send between NVLink partitions.
+- **Fabric management.** No subnet manager, UFM or `ibdiagnet`, and no link state or error counters. [Part 6](@/ai-lab/06-observability/index.md) can show InfiniBand traffic, but not faults. There are no partition keys either, so you can't test fabric isolation between tenants.
+- **In-network computing.** No SHARP, so no reductions offloaded to the switches.
+- **Ethernet compute fabrics.** No RoCE and no Spectrum-X.
+- **BlueField DPUs.** No DPUs and no DOCA, so nothing is offloaded to a DPU and there's no DPU BMC. The front end is a plain Linux interface.
+- **Separate networks.** The front end, storage, management and the pod network share one bridge, so you can't rehearse a management network outage or a congested storage network.
+- **Scale.** The lab is a single NVLink domain under a single leaf and spine, while real clusters have hundreds of leaves.
+- **Network faults.** You can't fail an InfiniBand link the way the BMCs fail an NVLink ([Part 4](@/ai-lab/04-bmc-redfish/index.md)). You can only imitate network faults on the Linux bridge, for example with `tc`.
 
 ## What you can still do with it
 
-- Test **topology-aware placement** end to end: real `ibnetdiscover` format, real topograph, real Slurm `topology.conf` and Kueue labels. Combined with NVLink partitions ([Part 5](@/ai-lab/05-nvlink/index.md)), that's enough to see the scheduler's view change; a multi-leaf fabric is a natural extension of `fakeib`.
-- Write and test **parsers and inventory tools** for `ibnetdiscover` output against a stable, known fabric.
-- Exercise the **front-end network**: storage throughput on JuiceFS, the Kubernetes pod network and its DNS, LDAP and S3 from jobs.
-- Make **wrong assumptions fail cheaply**. If your tooling expects `/sys/class/infiniband` or `ibstat`, the lab tells you right away, and that's a reminder to test that part on real hardware.
+- **Topology-aware placement.** The `ibnetdiscover` output, topograph, Slurm's `topology.conf` and Kueue's labels are all real, so you can test how the scheduler places jobs. Change the NVLink partitions ([Part 5](@/ai-lab/05-nvlink/index.md)) and watch its view change.
+- **Traffic between partitions.** Split the NVLink domain, run a job across it, and watch NCCL's traffic move to InfiniBand in Prometheus.
+- **Parsers and inventory tools** for `ibnetdiscover` output, against a fabric that doesn't change under you.
+- **The front-end network.** JuiceFS storage, the Kubernetes pod network and its DNS, and LDAP and S3 from jobs.
+- **Wrong assumptions.** If your tools expect `/sys/class/infiniband` or `ibstat`, they fail right away in the lab. That's your reminder to test that part on real hardware.
 
 ## Next in the series
 

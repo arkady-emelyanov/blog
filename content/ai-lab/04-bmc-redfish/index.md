@@ -1,5 +1,5 @@
 +++
-title = "AI lab, part 4: BMCs and Redfish, the out-of-band side of a GPU rack"
+title = "AI lab, part 4: BMCs and Redfish"
 date = 2026-10-01
 description = "Out-of-band management of GPU trays with Redfish BMCs: inventory, GPU sensors, NVLink faults and power cycles."
 
@@ -8,6 +8,8 @@ social_media_card = "card.png"
 # Thumbnail in the post list.
 local_image = "ai-lab/04-bmc-redfish/card.png"
 +++
+
+## Overview
 
 Parts [2](@/ai-lab/02-slurm/index.md) and [3](@/ai-lab/03-kubernetes/index.md) used the cluster the way its users do, through a scheduler. A scheduler only knows what each tray's operating system reports, so a hung or powered-off tray can look healthy to it for minutes. This part covers the operator's back door: the baseboard management controllers (BMCs), which manage the hardware independently of the OS. I'll walk the Redfish tree, break NVLinks (NVIDIA's GPU-to-GPU links, introduced in [Part 1](@/ai-lab/01-intro/index.md#what-the-lab-is-made-of)) on purpose, and power-cycle a tray. The examples run in Slurm mode, but the BMCs are identical with Kubernetes. Commands that start with `bin/` run on the host from the repository root.
 
@@ -267,4 +269,4 @@ $ curl -sk -o /dev/null -w '%{http_code}\n' -H "X-Auth-Token: 3c4c9f1d0a424028a3
 
 ## Next in the series
 
-[Part 5: NVLink](@/ai-lab/05-nvlink/index.md) moves from single links to the whole fabric: NVLink partitions, the controller that manages them, fabric telemetry, and how a partition change rewrites the scheduler's topology.
+[Part 5: NVLink partitions](@/ai-lab/05-nvlink/index.md) moves from single links to the whole fabric: NVLink partitions, the controller that manages them, fabric telemetry, and how a partition change rewrites the scheduler's topology.

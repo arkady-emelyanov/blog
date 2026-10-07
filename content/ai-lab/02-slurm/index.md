@@ -1,5 +1,5 @@
 +++
-title = "AI lab, part 2: running an emulated GB200 cluster with Slurm"
+title = "AI lab, part 2: Slurm"
 date = 2026-09-29
 description = "Running the emulated GB200 cluster with Slurm: GPU scheduling, jobs from srun to PyTorch DDP, drains, quotas and monitoring."
 
@@ -9,9 +9,17 @@ social_media_card = "card.png"
 local_image = "ai-lab/02-slurm/card.png"
 +++
 
+## Overview
+
 [Part 1](@/ai-lab/01-intro/index.md) introduced the lab and NVLink, NVIDIA's GPU-to-GPU interconnect: one NVL8 NVLink domain with two trays of four emulated GB200 GPUs, running on a single Linux machine. This post covers the default scheduler, Slurm 23.11.
 
-I'll look at how Slurm is configured for GPUs, run jobs from a one-liner up to PyTorch DDP across both trays, do some routine operations, and watch it all in Prometheus.
+[Slurm](https://github.com/SchedMD/slurm) is an open-source job scheduler, common on HPC and GPU clusters. You submit a job, Slurm finds free resources for it, runs it and records what it used. A Slurm cluster has three kinds of nodes:
+
+- **Login node**: where users log in and submit jobs. In the lab: `sched-login`
+- **Controller**: runs `slurmctld`, which decides where each job runs. In the lab: `sched-control`
+- **Compute nodes**: run `slurmd`, which starts the jobs. In the lab: the two trays
+
+I'll show how Slurm is configured for GPUs, then run jobs from a one-liner up to PyTorch DDP (training one model on several GPUs at once) across both trays, do some routine operations, and watch it all in Prometheus.
 
 Commands that start with `bin/` run on the host, from the repository root. All other commands run on the login node as `joe`, the lab's regular user from [Part 1](@/ai-lab/01-intro/index.md#first-contact); `bin/ssh login` gets you there.
 
@@ -30,10 +38,10 @@ sched-worker2 gpu:gb200:4 4 7500 51200 idle
 
 There is one partition with two nodes, one per tray. Each node has:
 
-- four GPUs of type `gb200`,
-- 4 cores,
-- 7.5 GB of schedulable memory,
-- 50 GB of node-local scratch.
+- four GPUs of type `gb200`
+- 4 cores
+- 7.5 GB of schedulable memory
+- 50 GB of node-local scratch
 
 Slurm treats GPUs as a **generic resource** (GRES), written as `gpu:gb200:4`. Jobs ask for GPUs the same way they ask for CPUs and memory.
 
@@ -290,8 +298,8 @@ All eight GPUs move together:
 
 - **GPU utilisation** jumps to about 87 % when the job starts and drops to 0 when it ends.
 - **GPU memory used** goes to about 7 GiB per GPU and stays there until the job ends.
-- **GPU power** goes from about 140 W to 870–900 W per GPU.
-- **GPU temperature** climbs to 69–70 °C over about a minute. When the job ends, it drops straight back to idle: the epilog resets the job's GPUs ([Part 8](@/ai-lab/08-gpu-handover/index.md)).
+- **GPU power** goes from about 140 W to 870-900 W per GPU.
+- **GPU temperature** climbs to 69-70 °C over about a minute. When the job ends, it drops straight back to idle: the epilog resets the job's GPUs ([Part 8](@/ai-lab/08-gpu-handover/index.md)).
 - **Processes on GPUs** shows 4 per tray, one per GPU.
 - **NVL8 domain power** is the total for all eight GPUs: about 7 kW.
 

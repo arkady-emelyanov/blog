@@ -1,5 +1,5 @@
 +++
-title = "AI lab, part 8: handing GPUs over between tenants"
+title = "AI lab, part 8: GPU handover"
 date = 2026-10-06
 description = "Why GPUs are reset between tenants and after NVLink partition changes, and how the lab does it with nvidia-smi --gpu-reset and a Slurm epilog."
 
@@ -8,6 +8,8 @@ social_media_card = "card.png"
 # Thumbnail in the post list.
 local_image = "ai-lab/08-gpu-handover/card.png"
 +++
+
+## Overview
 
 When a GPU moves from one tenant to another, two things have to happen before the next job starts. The GPU's memory and state must be cleared, so the next tenant can't read what the previous one left behind. And if the GPU moved to another NVLink partition ([Part 5](@/ai-lab/05-nvlink/index.md)), it must start using the new one. On GB200 both happen at the same moment: a GPU reset.
 
