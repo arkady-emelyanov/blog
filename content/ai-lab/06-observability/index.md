@@ -22,7 +22,7 @@ local_image = "ai-lab/06-observability/card.png"
 The earlier parts each peeked at a metric or two. This one is about monitoring as a whole: which layers of a GPU cluster need watching, what each layer's signals mean, and how to read the lab's Grafana dashboards. The screenshots come from one scripted 10-minute run on the lab in Kubernetes mode. The dashboards are identical in Slurm mode.
 
 {% <admonition type="note" title="The numbers are simulated"> %}
-The GPU utilisation, power and temperature in this post are modelled, and the NVLink and InfiniBand bytes are counted, not sent. The shapes are realistic enough to build dashboards, alerts and runbooks on, but the values say nothing about how a real GB200 performs.
+The GPU utilisation, power and temperature in this post are modelled, and the NVLink and InfiniBand bytes are counted, not sent. The values follow the load, which is enough to build dashboards, alerts and runbooks on, but they say nothing about how a real GB200 performs.
 {% </admonition> %}
 
 ## Why one dashboard isn't enough

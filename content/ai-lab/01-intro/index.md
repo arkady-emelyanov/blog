@@ -28,7 +28,7 @@ Most of the work in AI infrastructure isn't the GPUs themselves. It's everything
 
 For systems and software engineers, this is hard to learn: you can't practise on a GB200 rack you don't have, and cloud GPU instances hide exactly these layers.
 
-[ai-lab](https://github.com/arkady-emelyanov/ai-lab) is my attempt at a way around that. It's a complete GPU cluster that runs on a single Linux machine. The GPUs are emulated, but everything around them is real.
+[ai-lab](https://github.com/arkady-emelyanov/ai-lab) is my attempt at a way around that. It's a complete GPU cluster that runs on a single Linux machine. The GPUs are emulated, but everything around them is real: the scheduler, the frameworks and the tools are the real software, unmodified. They run against a model of what a GB200 NVL8 rack shows to software (its APIs, topology, telemetry, timing and failures), not against the silicon. This is called software-in-the-loop testing.
 
 That works because most of those layers never use a GPU for computation:
 
@@ -40,8 +40,13 @@ All of that works against GPUs that answer the right API calls, whether or not t
 
 {{< figure src="overview.png" alt="AI lab at a glance: an emulated GB200 NVL8 domain (NVLink switch tray, two GPU trays with 4 × GB200 each, BMCs, InfiniBand) plus login, control and storage instances, all inside a single Linux machine" caption="AI lab overview: the NVL8 domain and the platform instances" />}}
 
-{% <admonition type="note" title="What the lab is not"> %}
-It's not a performance model: timings are approximations, and the emulated NCCL ranks never exchange any data, so a dead peer doesn't hang a collective as it would on real hardware. It's not a scale model either: a single NVLink domain is enough to exercise every interface, but not to study a large cluster. Containers share the host kernel, so Slurm jobs aren't confined by cgroups, and the Kubernetes GPUs come from the lab's own device plugin rather than NVIDIA's. The repository's README lists the other limitations.
+{% <admonition type="note" title="What the lab is not for"> %}
+- Benchmarking or capacity planning from the lab's timings
+- Checking numerical results or model accuracy
+- Developing or tuning CUDA kernels
+- Rehearsing hardware failures the lab doesn't model
+
+[What is real and what is modelled](#what-is-real-and-what-is-modelled) below has the details.
 {% </admonition> %}
 
 ## What the lab is made of
@@ -73,16 +78,24 @@ The emulated hardware is set by variables. `inventory/group_vars/all.yml` has th
 The lab's size (trays, GPUs per tray, switches) is fixed. "Hardware parameters" in the lab's [`docs/platform.md`](https://github.com/arkady-emelyanov/ai-lab/blob/main/docs/platform.md) links to every variable.
 {% </admonition> %}
 
-## Where the emulation stops
+## What is real and what is modelled
 
-Each GPU tray has `/dev/nvidia0-3` and stub versions of NVIDIA's software: the CUDA driver, NVML, cuBLAS, cuDNN, NCCL and `nvidia-smi`. The stubs implement the real APIs, so PyTorch and Ray run unmodified on top of them.
+Each GPU tray has `/dev/nvidia0-3` and stub versions of NVIDIA's software: the CUDA driver, NVML, cuBLAS, cuDNN, NCCL and `nvidia-smi`. The stubs implement the real APIs, so PyTorch and Ray run unmodified on top of them. Everything above the stubs is real:
 
-The stubs also model timing and telemetry, because schedulers, dashboards and timeouts depend on both:
+- **Slurm, k3s, Kueue, JobSet, topograph and GPU Feature Discovery** are real, with real configuration, scheduling, accounting and topology-aware placement. The differences are that Slurm jobs aren't confined by cgroups (the trays are containers sharing the host kernel), Slurm is version 23.11, and k3s gets its GPUs from the lab's own device plugin rather than NVIDIA's.
+- **PyTorch, Ray and your applications** are real and unmodified. They initialise, set up process groups and handle the errors the APIs below them return. Only their numerical results are meaningless.
+- **Prometheus, Grafana, LDAP and the storage** are real.
 
-- Every call succeeds and takes **realistic time**: a matrix multiply takes about as long as it would on a GB200, an all-reduce as long as NVLink bandwidth allows.
-- While a job runs, the GPUs report load, memory, power and temperature that rise and fall with it.
+The hardware and NVIDIA's software are modelled:
 
-Nothing is actually computed: tensors hold zeros, so the numbers from a training run mean nothing. Everything around the numbers works: scheduling, GPU binding, accounting, monitoring, failure handling and out-of-band management.
+- **CUDA, cuBLAS and cuDNN** report the GPU's properties, manage memory up to the GPU's size (and run out of memory beyond it), and time every operation. Kernels don't run, and tensors hold zeros.
+- **NVML and `nvidia-smi`** report the GPU's identity, NVLink state, NVLink partition, NUMA layout and processes, and support GPU reset. Utilisation, power and temperature follow a model of the load, not measured curves.
+- **NCCL** creates communicators and times collectives over NVLink inside a partition and over InfiniBand across partitions. No data is exchanged, so a dead peer or a broken link doesn't make a collective fail as it would on real hardware.
+- **NVLink and NVSwitch** have 18 links per GPU to two 72-port switches, partitions that take effect at GPU reset, links that can be disabled, and fabric telemetry. There is a single NVL8 domain, enough to exercise every interface but not to study a large cluster.
+- **The BMCs** follow the GB200 Redfish layout, with power actions that really stop and start the tray, GPU sensors and firmware inventory. IPMI and BlueField DPUs aren't modelled.
+- **InfiniBand** has a topology that tools like topograph can discover, byte counters on the network cards, and its 400 Gb/s link rate in NCCL timing. No packets are sent.
+
+Timing is a behavioural model, not a prediction. Each operation's duration comes from documented GB200 figures (compute rate, memory, NVLink and InfiniBand bandwidth) applied to its size. Jobs take a plausible time and put a plausible load on the GPUs and links, but the figures aren't calibrated against hardware and don't predict real GB200 performance. The full list is under "What is real and what is modelled" in the lab's [README](https://github.com/arkady-emelyanov/ai-lab).
 
 `nvidia-smi topo -m` shows how the GPUs in one tray are connected to each other. Here it runs on the first GPU tray, `sched-worker1`:
 
@@ -111,7 +124,7 @@ The table shows the lab's current state, so it changes when the hardware does:
 ## What you can practise
 
 - **Scheduler work.** Write and test job portals, quota tools, scheduler plugins and user CLIs against a real Slurm (GRES, accounting, `topology/block`) or a real Kubernetes setup (device plugin, GPU Feature Discovery, Kueue topology-aware scheduling, JobSet).
-- **Monitoring and operations.** Build dashboards and alerts on realistic GPU, scheduler and NVLink metrics, and rehearse drains, power cycles, link failures and partition changes.
+- **Monitoring and operations.** Build dashboards and alerts on live GPU, scheduler and NVLink metrics, and rehearse drains, power cycles, link failures and partition changes.
 - **Hardware management tooling.** Point Redfish clients and BMC automation at three BMCs modelled on NVIDIA's OpenBMC fork, and drive an NMX-C-style partition controller over gRPC.
 - **AI pipelines.** Run [PyTorch DDP](https://docs.pytorch.org/docs/stable/notes/ddp.html) (distributed data-parallel training) and [Ray](https://github.com/ray-project/ray) (distributed Python) end to end on 8 GPUs to test orchestration, data movement and failure handling. The numerics are meaningless, but the plumbing is real.
 - **CI for infrastructure code.** `make up && make test` builds and verifies the whole cluster from scratch.

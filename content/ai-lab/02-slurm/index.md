@@ -123,7 +123,7 @@ NodeName=sched-worker1,sched-worker2 … RealMemory=7500 TmpDisk=51200 Gres=gpu:
 
 ### GPU binding
 
-Slurm calls assigning specific GPUs to a task *binding* (see the `--gpu-bind` option). It tells each task which GPUs it may use through the `CUDA_VISIBLE_DEVICES` variable. Ask for 8 tasks with one GPU each and print the variable in every task:
+Slurm calls assigning specific GPUs to a task *binding*, set with the `--gpu-bind` option of [`srun`](https://slurm.schedmd.com/srun.html). Slurm tells each task which GPUs it may use through the `CUDA_VISIBLE_DEVICES` variable. Ask for 8 tasks with one GPU each and print the variable in every task:
 
 ```console
 $ srun -N2 --ntasks-per-node=4 --gpus-per-task=1 bash -c 'echo $(hostname) $CUDA_VISIBLE_DEVICES' | sort
