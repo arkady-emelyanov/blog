@@ -191,7 +191,7 @@ step 60000      4.3 ms    119404 samples/s      48 TFLOP/s/GPU
 rank 0/8 on sched-worker1 cuda:0 (NVIDIA GB200) peak mem 7.1 GiB
 ```
 
-The step time is simulated: it's roughly how long the matrix multiplications and the all-reduce would take on GB200s. Change `--width` or `--batch` and it changes about as it would on real hardware. The loss values are not real, because the emulated GPUs don't do the math.
+The step time is simulated: it's roughly how long the matrix multiplications and the all-reduce would take on GB200s. Change `--width` or `--batch` and it changes about as it would on real hardware. The loss values are not real, because there's no real GPU math: the GPU kernels never actually execute.
 
 ## Operations
 

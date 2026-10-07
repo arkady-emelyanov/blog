@@ -36,7 +36,7 @@ That works because most of those layers never use a GPU for computation:
 - The monitoring exporter calls NVML, NVIDIA's management library.
 - The BMC answers Redfish requests over HTTPS.
 
-All of that works against GPUs that answer the right API calls, whether or not they compute anything. It's like a stub in a unit test: the GPU stack is replaced with an implementation of the same APIs, and the rest of the cluster runs against it unchanged.
+All of that works against GPUs that answer the right API calls, whether or not GPU kernels ever actually execute. It's like a stub in a unit test: the GPU stack is replaced with an implementation of the same APIs, and the rest of the cluster runs against it unchanged.
 
 {{< figure src="overview.png" alt="AI lab at a glance: the emulated NVL8 domain (NVLink switch tray, two GPU trays with 4 × GB200 each, BMCs, InfiniBand) plus login, control and storage instances, all inside a single Linux machine" caption="AI lab overview: the NVL8 domain and the platform instances" />}}
 
@@ -83,12 +83,12 @@ The lab's size (trays, GPUs per tray, switches) is fixed. "Hardware parameters" 
 Each GPU tray has `/dev/nvidia0-3` and stub versions of NVIDIA's software: the CUDA driver, NVML, cuBLAS, cuDNN, NCCL and `nvidia-smi`. The stubs implement the real APIs, so PyTorch and Ray run unmodified on top of them. Everything above the stubs is real:
 
 - **Slurm, k3s, Kueue, JobSet, topograph and GPU Feature Discovery** are real, with real configuration, scheduling, accounting and topology-aware placement. A few things differ from a production cluster. Slurm jobs aren't confined by cgroups, because the trays are containers that share the host kernel. Slurm is version 23.11, which doesn't have the newer options for placing jobs across blocks (`--segment` and `BlockSizes`). And k3s gets its GPUs from the lab's own device plugin rather than NVIDIA's.
-- **PyTorch, Ray and your applications** are real and unmodified. They initialise, set up process groups and handle the errors the APIs below them return. Only their numerical results are meaningless.
+- **PyTorch, Ray and your applications** are real and unmodified. They initialise, set up process groups and handle the errors the APIs below them return. Only their numerical results are meaningless, because there's no real GPU math.
 - **Prometheus, Grafana, LDAP and the storage** are real.
 
 The hardware and NVIDIA's software are modelled:
 
-- **CUDA, cuBLAS and cuDNN** report the GPU's properties, manage memory up to the GPU's size (and run out of memory beyond it), and time every operation. Kernels don't run, and tensors hold zeros.
+- **CUDA, cuBLAS and cuDNN** report the GPU's properties, manage memory up to the GPU's size (and run out of memory beyond it), and time every operation. GPU kernels never actually execute, and tensors hold zeros.
 - **NVML and `nvidia-smi`** report the GPU's identity, NVLink state, NVLink partition, NUMA layout and processes, and support GPU reset. Utilisation, power and temperature follow a model of the load, not measured curves.
 - **NCCL** creates communicators and times collectives over NVLink inside a partition and over InfiniBand across partitions. No data is exchanged, so a dead peer or a broken link doesn't make a collective fail as it would on real hardware.
 - **NVLink and NVSwitch** have 18 links per GPU to two 72-port switches, partitions that take effect at GPU reset, links that can be disabled, and fabric telemetry. There is a single NVL8 domain, enough to exercise every interface but not to study a large cluster.
@@ -137,7 +137,7 @@ The times come from the timing model, so what matters is the chain of effects an
 - **Scheduler work.** Write and test job portals, quota tools, scheduler plugins and user CLIs against a real Slurm (GRES, accounting, `topology/block`) or a real Kubernetes setup (device plugin, GPU Feature Discovery, Kueue topology-aware scheduling, JobSet).
 - **Monitoring and operations.** Build dashboards and alerts on live GPU, scheduler and NVLink metrics, and rehearse drains, power cycles, link failures and partition changes.
 - **Hardware management tooling.** Point Redfish clients and BMC automation at three BMCs modelled on NVIDIA's OpenBMC fork, and drive an NMX-C-style partition controller over gRPC.
-- **AI pipelines.** Run [PyTorch DDP](https://docs.pytorch.org/docs/stable/notes/ddp.html) (distributed data-parallel training) and [Ray](https://github.com/ray-project/ray) (distributed Python) end to end on 8 GPUs to test orchestration, data movement and failure handling. The numerics are meaningless, but the plumbing is real.
+- **AI pipelines.** Run [PyTorch DDP](https://docs.pytorch.org/docs/stable/notes/ddp.html) (distributed data-parallel training) and [Ray](https://github.com/ray-project/ray) (distributed Python) end to end on 8 GPUs to test orchestration, data movement and failure handling. There's no real GPU math, but the plumbing is real.
 - **CI for infrastructure code.** `make up && make test` builds and verifies the whole cluster from scratch.
 
 ## Requirements
