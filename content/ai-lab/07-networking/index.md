@@ -13,12 +13,10 @@ local_image = "ai-lab/07-networking/card.png"
 
 ## The networks of a GPU cluster
 
-| Network | Carries | In the lab |
-|---|---|---|
-| NVLink | GPU-to-GPU traffic inside one NVLink domain | emulated: links, partitions, health, traffic counters ([Part 5](@/ai-lab/05-nvlink/index.md)) |
-| Compute fabric (InfiniBand or RoCE Ethernet) | GPU-to-GPU traffic *between* NVLink domains: the scale-out network | **topology only** |
-| Front-end Ethernet | logins, scheduler, storage, container images, everything else | real: the Incus bridge |
-| Out-of-band management | BMCs | shares the Incus bridge |
+- **NVLink** carries GPU-to-GPU traffic inside one NVLink domain. In the lab: emulated, with links, partitions, health and traffic counters ([Part 5](@/ai-lab/05-nvlink/index.md)).
+- **The compute fabric** (InfiniBand or RoCE Ethernet) carries GPU-to-GPU traffic *between* NVLink domains: the scale-out network. In the lab: **topology only**.
+- **Front-end Ethernet** carries logins, scheduler, storage, container images and everything else. In the lab: real, the Incus bridge.
+- **Out-of-band management** connects the BMCs. In the lab: it shares the Incus bridge.
 
 On a real rack these are separate wires. GB200 compute trays carry ConnectX adapters for the compute fabric and BlueField-3 DPUs for the front end, and the BMCs sit on their own management network. In the lab, everything that isn't NVLink runs over one Linux bridge.
 
@@ -39,16 +37,18 @@ eth0@if355       UP             10.107.111.21/24 metric 100 …
 
 The rendezvous is a handful of small messages. The training traffic itself, the gradients exchanged in every all-reduce, never touches the Ethernet side (`eth0` and the pod network on top of it). With the 8-GPU DDP job running ([Part 6](@/ai-lab/06-observability/index.md)), Prometheus showed:
 
-| Query | Reading |
-|---|---|
-| `rate(node_network_transmit_bytes_total{device="eth0", instance=~"sched-worker.*"}[1m])` | about 6 KB/s per tray |
-| `sum by (host) (rate(nvlink_gpu_tx_bytes_total[1m]))` | about 1.76 TB/s per tray |
+- Ethernet traffic from each tray, about 6 KB/s:\
+  `rate(node_network_transmit_bytes_total{device="eth0", instance=~"sched-worker.*"}[1m])`
+- NVLink traffic from each tray, about 1.76 TB/s:\
+  `sum by (host) (rate(nvlink_gpu_tx_bytes_total[1m]))`
 
-That's correct for this topology, not just an emulation shortcut. Both trays are in one NVLink domain, so a real NCCL would route the all-reduce over NVLink as well. The compute fabric only carries GPU traffic *between* NVLink domains, and the lab has only one.
+A real cluster wired like the lab would show the same split. Both trays are in one NVLink domain, so a real NCCL would route the all-reduce over NVLink as well. The compute fabric only carries GPU traffic *between* NVLink domains, and the lab has only one.
 
 ## The compute fabric: InfiniBand as topology
 
-What the lab does emulate is the part of InfiniBand that cluster software reads: the switch topology. Each tray has a fake `ibnetdiscover` that prints an NDR fabric with one spine, one leaf and four HCAs per tray, described in `/etc/fakeib.json`:
+InfiniBand is the network most GPU clusters use between NVLink domains. It was built for HPC and offers very low latency and RDMA, which lets one machine write straight into another's memory without involving either CPU. Its switches are usually wired as a **leaf-spine** tree: hosts plug into leaf switches, and leaves connect to each other through spine switches. Each host connects through an **HCA** (host channel adapter), InfiniBand's name for a network card.
+
+The lab carries no InfiniBand traffic. It emulates only the part that cluster software reads: the switch topology. Each tray has an emulated `ibnetdiscover` that prints an NDR fabric with one spine, one leaf and four HCAs per tray, described in `/etc/fakeib.json`:
 
 ```console
 $ bin/ssh sched-worker1 sudo ibnetdiscover
@@ -86,9 +86,9 @@ $ bin/ssh sched-worker1 ls /sys/class/infiniband
 ls: cannot access '/sys/class/infiniband': No such file or directory
 ```
 
-The list of things the lab doesn't model is long, and worth knowing before you build on it:
+What the lab doesn't model:
 
-- **RDMA and GPUDirect.** No verbs devices, no RDMA traffic, no GPUDirect RDMA or GPUDirect Storage. NCCL's InfiniBand transport, and anything that tunes it (`NCCL_IB_HCA`, adaptive routing, rail alignment), has nothing to act on. The fake NCCL doesn't use a network at all.
+- **RDMA and GPUDirect.** No verbs devices, no RDMA traffic, no GPUDirect RDMA or GPUDirect Storage. NCCL's InfiniBand transport, and anything that tunes it (`NCCL_IB_HCA`, adaptive routing, rail alignment), has nothing to act on. The emulated NCCL doesn't use a network at all.
 - **Fabric management.** No subnet manager, no UFM, no `ibdiagnet`, no port counters or link errors, so the scale-out layer of [Part 6](@/ai-lab/06-observability/index.md) has nothing to scrape. There are no partition keys either, so multi-tenant fabric isolation can't be tested.
 - **In-network computing.** No SHARP, so no switch-offloaded reductions.
 - **Ethernet compute fabrics.** No RoCE and no Spectrum-X; the compute fabric is InfiniBand-shaped only.

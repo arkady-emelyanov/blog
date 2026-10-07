@@ -254,13 +254,16 @@ Prometheus (`http://10.107.111.10:9090`) collects the same GPU values through th
 
 Here are some of them while the DDP job runs, with `nvl8-hello` submitted after it and waiting for free GPUs:
 
-| Query | Value during the job |
-|---|---|
-| `sched_gpus_alloc` | `8` |
-| `sched_user_gpus` | `{user="joe"} 8` |
-| `sched_jobs` | `RUNNING 1`, `PENDING 1` |
-| `sum by (instance) (nvidia_smi_utilization_gpu_ratio)` | `3.32` and `3.38` per tray (4 GPUs × ~80 %) |
-| `sum(rate(nvlink_gpu_tx_bytes_total[1m]))` | ~3.4 TB/s of all-reduce traffic over NVLink |
+- GPUs allocated, `8`:\
+  `sched_gpus_alloc`
+- GPUs per user, 8 for `joe`:\
+  `sched_user_gpus`
+- Jobs by state, one running and one pending:\
+  `sched_jobs`
+- GPU utilisation per tray, `3.32` and `3.38` (4 GPUs × ~80 %):\
+  `sum by (instance) (nvidia_smi_utilization_gpu_ratio)`
+- All-reduce traffic over NVLink, about 3.4 TB/s:\
+  `sum(rate(nvlink_gpu_tx_bytes_total[1m]))`
 
 ### Lab overview dashboard
 

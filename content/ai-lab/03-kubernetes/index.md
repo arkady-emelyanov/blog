@@ -64,14 +64,12 @@ no
 
 ## How Kubernetes is configured for GPUs
 
-| Piece | What it does |
-|---|---|
-| k3s 1.36 | control plane on `sched-control`, agents on the trays, all in unprivileged Incus containers |
-| `fakedp` + CDI | device plugin advertising `nvidia.com/gpu` (4 per tray); each GPU is a CDI device in `/etc/cdi/fakegpu.json` that injects `/dev/nvidia<n>` and the emulated driver |
-| Node Feature Discovery + GPU Feature Discovery | the real NVIDIA/upstream components, labelling trays from NVML |
-| topograph | labels NVLink domain and InfiniBand tiers every minute |
-| Kueue | ClusterQueue `gpu` (8 CPUs, 18 GiB, 8 GPUs); in each user namespace a LocalQueue `gpu` and a `default` one for workloads without a queue label; topology-aware scheduling |
-| JobSet | multi-pod jobs with stable DNS names for rank 0 |
+- **k3s 1.36**: control plane on `sched-control`, agents on the trays, all in unprivileged Incus containers.
+- **`fakedp` and CDI**: a device plugin advertising `nvidia.com/gpu`, 4 per tray. Each GPU is a CDI device in `/etc/cdi/fakegpu.json` that injects `/dev/nvidia<n>` and the emulated driver.
+- **Node Feature Discovery and GPU Feature Discovery**: the real NVIDIA and upstream components, labelling trays from NVML.
+- **topograph**: labels the NVLink domain and InfiniBand tiers every minute.
+- **Kueue**: ClusterQueue `gpu` (8 CPUs, 18 GiB, 8 GPUs). In each user namespace, a LocalQueue `gpu` and a `default` one for workloads without a queue label. Topology-aware scheduling.
+- **JobSet**: multi-pod jobs with stable DNS names for rank 0.
 
 A **device plugin** is how Kubernetes learns about hardware it doesn't know natively. It advertises a resource such as `nvidia.com/gpu` on each node, and when a pod lands there, it tells the container runtime which devices to hand over. **CDI** (Container Device Interface) is the format for that hand-over: a spec file listing, per device, what to inject into the container.
 
@@ -202,14 +200,18 @@ Kueue sees that only one tray's worth of GPUs is schedulable inside the domain a
 
 Cluster state reaches Prometheus through kube-state-metrics (NodePort 30808): nodes and their allocatable GPUs, pods' GPU requests, Jobs and their status. Recording rules turn it into the same `sched_*` series that Slurm's exporter feeds in Part 2 (GPUs allocated, GPUs per user, jobs and nodes by state), so the Grafana dashboards don't need to know which scheduler is running. With a 60,000-step DDP run holding all 8 GPUs and `nvl8-hello` queued behind it:
 
-| Query | Value |
-|---|---|
-| `sched_gpus_alloc` | `8` |
-| `sched_user_gpus` | `{namespace="joe", user="joe"} 8` |
-| `sched_jobs{state!="COMPLETED"}` | `RUNNING 1`, `PENDING 1` |
-| `sched_nodes` | `READY 2` |
-| `sum by (instance) (nvidia_smi_utilization_gpu_ratio)` | `3.48` per tray (4 GPUs × ~87 %) |
-| `sum by (instance) (nvidia_smi_compute_apps)` | `4` per tray |
+- GPUs allocated, `8`:\
+  `sched_gpus_alloc`
+- GPUs per user, 8 for `joe`:\
+  `sched_user_gpus`
+- Jobs that haven't completed, one running and one pending:\
+  `sched_jobs{state!="COMPLETED"}`
+- Nodes ready, `2`:\
+  `sched_nodes`
+- GPU utilisation per tray, `3.48` (4 GPUs × ~87 %):\
+  `sum by (instance) (nvidia_smi_utilization_gpu_ratio)`
+- Processes on GPUs, `4` per tray:\
+  `sum by (instance) (nvidia_smi_compute_apps)`
 
 A Job that Kueue keeps suspended counts as `PENDING`, so the queue is visible next to the allocation. In Grafana's *Scheduler & NVLink fabric* dashboard it shows up as a stacked band under the running job:
 

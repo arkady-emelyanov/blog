@@ -28,3 +28,10 @@ article h3 {
   font-size: 1.12rem;
   margin-top: 1.6em;
 }
+
+/* The same gap under every heading, whatever follows it: tabi gives
+   paragraphs a small top margin and lists none. Margins collapse, so the
+   heading's bottom margin sets the gap in both cases. */
+article :is(h2, h3, h4) {
+  margin-bottom: 0.8rem;
+}

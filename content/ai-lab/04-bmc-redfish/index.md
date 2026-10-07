@@ -19,10 +19,8 @@ A **BMC** is a small computer on every server board with its own network port an
 
 The lab has three BMCs:
 
-| BMC | Address | Manages |
-|---|---|---|
-| `sched-worker1-bmc`, `sched-worker2-bmc` | .31, .32 | a GPU tray: power, 4 GPUs, 18 NVLink ports each |
-| `sched-nvswitch-bmc` | .33 | the switch tray: 2 NVSwitch chips × 72 ports |
+- `sched-worker1-bmc` (10.107.111.31) and `sched-worker2-bmc` (10.107.111.32) each manage a GPU tray: its power, 4 GPUs and their 18 NVLink ports each.
+- `sched-nvswitch-bmc` (10.107.111.33) manages the switch tray: 2 NVSwitch chips with 72 ports each.
 
 The credentials are OpenBMC's defaults, `root` / `0penBmc`, and the certificates are self-signed.
 

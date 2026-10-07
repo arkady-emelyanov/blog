@@ -206,12 +206,14 @@ nvswitch_ports_up{host="sched-nvswitch",switch="NVSwitch_1"} 72
 
 With the 8-GPU DDP job from [Part 2](@/ai-lab/02-slurm/index.md) running (`sbatch ddp-train.sbatch --steps 60000`), Prometheus shows the all-reduce traffic:
 
-| Query | Reading |
-|---|---|
-| `sum by (host) (rate(nvlink_gpu_tx_bytes_total[1m]))` | ~1.68 TB/s from each tray |
-| `rate(nvswitch_tx_bytes_total[1m])` | ~1.68 TB/s per NVSwitch chip; each GPU spreads its links over both |
-| `sum(nvswitch_ports) - sum(nvswitch_ports_up)` | `0` ports down |
-| `min(nvlink_gpu_healthy)` | `1` |
+- NVLink traffic from each tray, about 1.68 TB/s:\
+  `sum by (host) (rate(nvlink_gpu_tx_bytes_total[1m]))`
+- Traffic per NVSwitch chip, also about 1.68 TB/s, because each GPU spreads its links over both chips:\
+  `rate(nvswitch_tx_bytes_total[1m])`
+- Switch ports down, `0`:\
+  `sum(nvswitch_ports) - sum(nvswitch_ports_up)`
+- All GPUs healthy, `1`:\
+  `min(nvlink_gpu_healthy)`
 
 The Grafana dashboard **Scheduler & NVLink fabric** puts these next to the scheduler panels: unhealthy GPUs, switch ports down, GPUs per partition, and NVLink and NVSwitch throughput. Disable a switch port as in Part 4 while DDP runs, and the *switch ports down* panel and the GPU's active-link count change within one scrape.
 
