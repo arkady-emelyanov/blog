@@ -25,7 +25,7 @@ Parts [2](@/ai-lab/02-slurm/index.md) and [3](@/ai-lab/03-kubernetes/index.md) u
 
 A **BMC** is a small computer on every server board with its own network port and its own power. Dell's iDRAC and HPE's iLO are BMCs. It stays up when the host is off or hung, and it can power the host on and off, report hardware inventory and health, and change firmware-level settings. In a GB200 rack every compute tray and every NVLink switch tray has one. A compute tray actually has two controllers: the tray's BMC, and the HGX Management Controller (HMC) on the GPU board, which looks after the GPUs. You only talk to the BMC, and it passes on what the HMC reports about the GPUs.
 
-**Redfish** is the DMTF's REST/JSON API for BMCs, and it replaced IPMI. Everything is a resource under `/redfish/v1`: you read with `GET`, change settings with `PATCH`, and trigger actions with `POST`. Vendors add their own fields under `Oem`. NVIDIA's GB200 BMCs run a fork of OpenBMC's `bmcweb`, and the lab's `fakebmc` is modelled on it, `Oem.Nvidia` fields included.
+**Redfish** is the DMTF's REST/JSON API for BMCs and its successor to IPMI. Everything is a resource under `/redfish/v1`: you read with `GET`, change settings with `PATCH`, and trigger actions with `POST`. Vendors add their own fields under `Oem`. NVIDIA's GB200 BMCs run a fork of OpenBMC's `bmcweb`, and the lab's `fakebmc` is modelled on it, `Oem.Nvidia` fields included.
 
 The lab has three BMCs:
 

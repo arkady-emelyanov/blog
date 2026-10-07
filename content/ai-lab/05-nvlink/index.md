@@ -36,7 +36,7 @@ A partition can hold part of a tray, down to a single GPU. NVML and the tray BMC
 In the lab, the domain is 8 GPUs, and the switch tray has two NVSwitch chips with 72 ports each. `sched-nvswitch` runs `fakenmxc`, an NMX-C-style controller. It speaks gRPC on port 9370 and serves fabric metrics on port 9372.
 
 {% <admonition type="note" title="The controller's API"> %}
-NVIDIA's `.proto` for NMX-C is proprietary, so `fakenmxc` has its own, and tools written against it need a different client for a real NMX-C. The behaviour follows NVIDIA's [GB200 NVL Partition User's Guide](https://docs.nvidia.com/multi-node-nvlink-systems/partition-guide-v1-2.pdf): the same partition operations (create, delete, add and remove GPUs), the default partition 32766, and a GPU reset after a partition change. The status codes for errors, such as `NMX_ST_GPU_IN_USE`, are the lab's own: the guide only names success and two control-plane errors.
+NVIDIA's `.proto` for NMX-C is proprietary, though its RPCs and return codes are publicly documented, so `fakenmxc` has its own, and tools written against it need a different client for a real NMX-C. The behaviour follows NVIDIA's [GB200 NVL Partition User's Guide](https://docs.nvidia.com/multi-node-nvlink-systems/partition-guide-v1-2.pdf): the same partition operations (create, delete, add and remove GPUs), the default partition 32766, and a GPU reset after a partition change. The return codes, such as `NMX_ST_RESOURCE_USED_IN_ANOTHER_PARTITION`, are the ones NVIDIA's [NMX-C gRPC API](https://networking-docs.nvidia.com/nmxcswum/130/grpc-api) documents.
 {% </admonition> %}
 
 ## Looking at the fabric

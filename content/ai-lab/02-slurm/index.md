@@ -19,7 +19,7 @@ local_image = "ai-lab/02-slurm/card.png"
 
 ## Overview
 
-[Part 1](@/ai-lab/01-intro/index.md) introduced the lab and NVLink, NVIDIA's GPU-to-GPU interconnect: one NVL8 NVLink domain with two trays of four emulated GB200 GPUs, running on a single Linux machine. This post covers the default scheduler, Slurm 23.11.
+[Part 1](@/ai-lab/01-intro/index.md) introduced the lab and NVLink, NVIDIA's GPU-to-GPU interconnect: one NVLink domain modelled on GB200 NVL72 and scaled down to two trays of four emulated GB200 GPUs (NVL8, the lab's own name, not an NVIDIA product), running on a single Linux machine. This post covers the default scheduler, Slurm 23.11.
 
 [Slurm](https://github.com/SchedMD/slurm) is an open-source job scheduler, common on HPC and GPU clusters. You submit a job, Slurm finds free resources for it, runs it and records what it used. A Slurm cluster has three kinds of nodes:
 
@@ -174,7 +174,7 @@ job 14 on sched-worker[1-2]: 8 tasks
 7: rank 7 on sched-worker2 CUDA_VISIBLE_DEVICES=3: NVIDIA GB200, GPU-814804a5-291e-ba91-a4e9-01fb69ea739b, 1, scratch  198G
 ```
 
-All eight GPUs are in clique `1`, which is the same NVLink partition, so traffic between any two ranks can stay on NVLink. [Part 5](@/ai-lab/05-nvlink/index.md) splits the domain and shows what Slurm does when a job can't fit in one partition.
+The `scratch` column is the size `df` reports for `/scratch`, which is the host's filesystem, not the 50 GB that Slurm advertises as `TmpDisk`. All eight GPUs are in clique `1`, which is the same NVLink partition, so traffic between any two ranks can stay on NVLink. [Part 5](@/ai-lab/05-nvlink/index.md) splits the domain and shows what Slurm does when a job can't fit in one partition.
 
 ### PyTorch DDP on 8 GPUs
 
@@ -207,7 +207,7 @@ $ sacct -X -o JobID,JobName,User,Account,AllocTRES%45,Elapsed,State
 3            nvl8-hello       joe        lab  billing=8,cpu=8,gres/gpu=8,mem=15000M,node=2   00:00:01  COMPLETED
 ```
 
-GPU-hour reports and chargeback are built on this data.
+The job IDs differ from the ones above because the listings come from separate runs of the lab. GPU-hour reports and chargeback are built on this data.
 
 ### Draining a node for maintenance
 
@@ -309,7 +309,7 @@ Open Grafana (`http://10.107.111.10:3000`) and the **Lab overview** dashboard:
 
 {{< figure src="lab-overview.png" alt="Lab overview dashboard: GPU utilisation, memory, power, temperature and processes rising together while the DDP job runs" caption="Lab overview dashboard during the DDP run" />}}
 
-All eight GPUs move together:
+The screenshot comes from a separate run, so its values differ a little from the samples above. All eight GPUs move together:
 
 - **GPU utilisation** jumps to about 87 % when the job starts and drops to 0 when it ends.
 - **GPU memory used** goes to about 7 GiB per GPU and stays there until the job ends.

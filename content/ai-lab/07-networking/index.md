@@ -68,7 +68,7 @@ NCCL, the library that runs the all-reduce, picks the fastest path between each 
 
 ## The compute fabric: InfiniBand
 
-InfiniBand is the network most GPU clusters use between NVLink domains. It was built for HPC and offers very low latency and RDMA, which lets one machine write straight into another's memory without involving either CPU. Each host connects through an **HCA** (host channel adapter), InfiniBand's name for a network card.
+InfiniBand is the classic choice for the network between NVLink domains, and the one NVIDIA's reference designs use; Ethernet (RoCE, Spectrum-X) is now at least as common. InfiniBand was built for HPC and offers very low latency and RDMA, which lets one machine write straight into another's memory without involving the remote CPU. Each host connects through an **HCA** (host channel adapter), InfiniBand's name for a network card.
 
 The switches are usually wired in two layers, **leaf** and **spine**:
 

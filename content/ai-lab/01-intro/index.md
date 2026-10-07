@@ -1,7 +1,7 @@
 +++
-title = "AI lab, part 1: GB200 NVL8 on your laptop (emulated)"
+title = "AI lab, part 1: a GB200 NVL72-style cluster, scaled down to your laptop"
 date = 2026-09-28
-description = "A GB200-class GPU cluster emulated on a single Linux machine: what it is, what you can practise with it, and how to set it up."
+description = "A GPU cluster modelled on NVIDIA GB200 NVL72, scaled down to two compute trays and emulated on a single Linux machine: what it is, what you can practise with it, and how to set it up."
 
 [extra]
 # Series navigation and table of contents are placed in the body (below).
@@ -28,7 +28,7 @@ Most of the work in AI infrastructure isn't the GPUs themselves. It's everything
 
 For systems and software engineers, this is hard to learn: you can't practise on a GB200 rack you don't have, and cloud GPU instances hide exactly these layers.
 
-[ai-lab](https://github.com/arkady-emelyanov/ai-lab) is my attempt at a way around that. It's a complete GPU cluster that runs on a single Linux machine. The GPUs are emulated, but everything around them is real: the scheduler, the frameworks and the tools are the real software, unmodified. They run against a model of what a GB200 NVL8 rack shows to software (its APIs, topology, telemetry, timing and failures), not against the silicon. This is called software-in-the-loop testing.
+[ai-lab](https://github.com/arkady-emelyanov/ai-lab) is my attempt at a way around that. It's a complete GPU cluster that runs on a single Linux machine. The GPUs are emulated, but everything around them is real: the scheduler, the frameworks and the tools are the real software, unmodified. They run against a model of what a GB200 NVL72 rack, scaled down to two compute trays, shows to software (its APIs, topology, telemetry, timing and failures), not against the silicon. This is called software-in-the-loop testing. I call the scaled-down version NVL8, which is the lab's own name, not an NVIDIA product.
 
 That works because most of those layers never use a GPU for computation:
 
@@ -38,7 +38,7 @@ That works because most of those layers never use a GPU for computation:
 
 All of that works against GPUs that answer the right API calls, whether or not they compute anything. It's like a stub in a unit test: the GPU stack is replaced with an implementation of the same APIs, and the rest of the cluster runs against it unchanged.
 
-{{< figure src="overview.png" alt="AI lab at a glance: an emulated GB200 NVL8 domain (NVLink switch tray, two GPU trays with 4 × GB200 each, BMCs, InfiniBand) plus login, control and storage instances, all inside a single Linux machine" caption="AI lab overview: the NVL8 domain and the platform instances" />}}
+{{< figure src="overview.png" alt="AI lab at a glance: the emulated NVL8 domain (NVLink switch tray, two GPU trays with 4 × GB200 each, BMCs, InfiniBand) plus login, control and storage instances, all inside a single Linux machine" caption="AI lab overview: the NVL8 domain and the platform instances" />}}
 
 {% <admonition type="note" title="What the lab is not for"> %}
 - Benchmarking or capacity planning from the lab's timings
@@ -51,7 +51,7 @@ All of that works against GPUs that answer the right API calls, whether or not t
 
 ## What the lab is made of
 
-The hardware side is one NVIDIA GB200-class **NVL8** NVLink domain. [NVLink](https://www.nvidia.com/en-us/data-center/nvlink/) is NVIDIA's GPU-to-GPU interconnect, and an NVLink domain is a set of GPUs that can all reach each other over it, even across trays, without going through the network. It's the unit a scheduler has to respect when it places a multi-GPU job. The lab's domain has:
+The hardware side is one **NVL8** NVLink domain: an 8-GPU slice of a GB200 NVL72-style domain, with two compute trays and one NVLink switch tray. [NVLink](https://www.nvidia.com/en-us/data-center/nvlink/) is NVIDIA's GPU-to-GPU interconnect, and an NVLink domain is a set of GPUs that can all reach each other over it, even across trays, without going through the network. It's the unit a scheduler has to respect when it places a multi-GPU job. The lab's domain has:
 
 - 2x GPU compute trays with 4x GB200 GPUs each
 - an NVLink switch tray with 2x NVSwitch chips (144 ports)
@@ -92,10 +92,11 @@ The hardware and NVIDIA's software are modelled:
 - **NVML and `nvidia-smi`** report the GPU's identity, NVLink state, NVLink partition, NUMA layout and processes, and support GPU reset. Utilisation, power and temperature follow a model of the load, not measured curves.
 - **NCCL** creates communicators and times collectives over NVLink inside a partition and over InfiniBand across partitions. No data is exchanged, so a dead peer or a broken link doesn't make a collective fail as it would on real hardware.
 - **NVLink and NVSwitch** have 18 links per GPU to two 72-port switches, partitions that take effect at GPU reset, links that can be disabled, and fabric telemetry. There is a single NVL8 domain, enough to exercise every interface but not to study a large cluster.
+- **The Grace CPUs** aren't emulated. The trays run on the host's x86-64 cores, so `scontrol show node` reports `Arch=x86_64` where a GB200 tray would report `aarch64`.
 - **The BMCs** follow the GB200 Redfish layout, with power actions that really stop and start the tray, GPU sensors and firmware inventory. IPMI and BlueField DPUs aren't modelled.
 - **InfiniBand** has a topology that tools like topograph can discover, byte counters on the network cards, and its 400 Gb/s link rate in NCCL timing. No packets are sent.
 
-Timing is a behavioural model, not a prediction. Each operation's duration comes from documented GB200 figures (compute rate, memory, NVLink and InfiniBand bandwidth) applied to its size. Jobs take a plausible time and put a plausible load on the GPUs and links, but the figures aren't calibrated against hardware and don't predict real GB200 performance. The full list is under "What is real and what is modelled" in the lab's [README](https://github.com/arkady-emelyanov/ai-lab).
+Timing is a behavioural model, not a prediction. Each operation's duration is derived from NVIDIA's published GB200 figures (compute rate, memory, NVLink and InfiniBand bandwidth) and applied to its size. The figures are simplified: one tensor rate covers all low-precision types, and some rates are estimated. Jobs take a plausible time and put a plausible load on the GPUs and links, but the figures aren't calibrated against hardware and don't predict real GB200 performance. The full list is under "What is real and what is modelled" in the lab's [README](https://github.com/arkady-emelyanov/ai-lab).
 
 `nvidia-smi topo -m` shows how the GPUs in one tray are connected to each other. Here it runs on the first GPU tray, `sched-worker1`:
 
@@ -125,7 +126,7 @@ A change travels through the whole stack the way it would on a real cluster. Thi
 3. Within a minute, topograph rewrites Slurm's topology: one block per tray instead of one for both. With Kubernetes, it relabels the nodes instead.
 4. Slurm prefers to keep a job inside one block. An 8-GPU job no longer fits in one, so it spans both.
 5. The emulated NCCL sends the traffic between the two halves over InfiniBand instead of NVLink, and the same training job takes 2:39 instead of 1:17.
-6. Prometheus shows the shift: InfiniBand traffic rises to about 120 GB/s per tray, and NVLink traffic falls from 3.52 to 1.36 TB/s.
+6. Prometheus shows the shift: InfiniBand traffic rises to about 120 GB/s per tray (240 GB/s for the domain), and NVLink traffic falls from 3.52 to 1.36 TB/s.
 
 {{< figure src="/ai-lab/05-nvlink/panel-nvlink-vs-ib.png" alt="Grafana panel: NVLink traffic at about 3.5 TB/s and no InfiniBand traffic during the first run; during the second run NVLink falls to about 1.4 TB/s and InfiniBand rises to about 240 GB/s" caption="NVLink vs InfiniBand traffic: the same DDP job on one partition, then split across two" />}}
 
@@ -141,7 +142,7 @@ The times come from the timing model, so what matters is the chain of effects an
 
 ## Requirements
 
-- Linux with [Incus](https://linuxcontainers.org/incus/), plus `make`, Python 3, Go, `jq` and git
+- x86-64 Linux with [Incus](https://linuxcontainers.org/incus/), plus `make`, Python 3, Go, `jq` and git
 - Your user in the `incus-admin` group
 - **RAM:** 16 GiB free (the running lab uses about 10 GiB)
 - **CPU:** 4 cores or more (with enough cores, `make up` gives each GPU tray cores of its own, so the trays don't slow each other down)

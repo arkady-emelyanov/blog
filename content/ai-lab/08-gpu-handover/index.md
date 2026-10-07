@@ -62,7 +62,7 @@ index, fabric.clique_id
 3, 1
 ```
 
-`nvidia-smi -q` shows why. The **GPU Recovery Action** field says the GPU is waiting for a reset:
+`nvidia-smi -q` shows why. In the lab, a pending partition change sets the **GPU Recovery Action** field to `GPU_RESET`, so the GPU reports that it's waiting for a reset:
 
 ```console
 $ bin/ssh sched-worker2 'nvidia-smi -i 0 -q | grep -E "GPU Recovery Action|CliqueId"'
@@ -70,7 +70,7 @@ $ bin/ssh sched-worker2 'nvidia-smi -i 0 -q | grep -E "GPU Recovery Action|Cliqu
         CliqueId                          : 1
 ```
 
-The partition guide (§10.4, GPU Recovery State) describes `GPU_RESET` as "A reset is required. Do not restart the application without completing a GPU reset." `bin/nvlink` shows the same per GPU in the `RESET` column, and the tray BMC from [Part 4](@/ai-lab/04-bmc-redfish/index.md) still reports the old clique too:
+Tying the field to partition changes is the lab's modelling: NVIDIA documents the recovery action for faults. The partition guide (§10.4, GPU Recovery State) describes `GPU_RESET` as "A reset is required. Do not restart the application without completing a GPU reset." `bin/nvlink` shows the same per GPU in the `RESET` column, and the tray BMC from [Part 4](@/ai-lab/04-bmc-redfish/index.md) still reports the old clique too:
 
 ```console
 $ bin/nvlink gpus sched-worker2
@@ -244,7 +244,7 @@ The handover is on by default. Adding `gpu_handover_reset: false` to `local.yml`
 
 ## Kubernetes has no such hook
 
-Kubernetes runs nothing on the node after a pod ends that could reset its GPUs, so in Kubernetes mode the lab has no handover. The GPUs are reset when a tray boots, and after a partition change you reset idle GPUs by hand with the same `nvidia-smi --gpu-reset`.
+The device-plugin API, which the lab uses, has no hook on the node after a pod ends that could reset its GPUs, so in Kubernetes mode the lab has no handover. DRA drivers do get such a call when a claim is released, but the lab doesn't use DRA. The GPUs are reset when a tray boots, and after a partition change you reset idle GPUs by hand with the same `nvidia-smi --gpu-reset`.
 
 ## What to build on this
 

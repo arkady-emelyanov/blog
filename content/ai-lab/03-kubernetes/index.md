@@ -133,7 +133,7 @@ spec:
 ```
 
 {% <admonition type="note" title="Container images"> %}
-The image comes from `mirror.gcr.io`, Google's public copy of Docker Hub, which has no anonymous pull limits. Plain `docker.io` names work too: each tray pulls them through the same mirror.
+The image comes from `mirror.gcr.io`, Google's public cache of popular Docker Hub images, so pulls don't count against Docker Hub's anonymous rate limit. Plain `docker.io` names work too: each tray pulls them through the same mirror.
 {% </admonition> %}
 
 ```console
