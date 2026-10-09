@@ -24,7 +24,9 @@ style = "class"
 [extra]
 # Article text in the sans-serif font the headings use (tabi defaults to serif).
 override_serif_with_sans = true
-theme_switcher = true
+# Dark only, like the rest of emelianov.cloud (static/css/space.css).
+theme_switcher = false
+default_theme = "dark"
 copy_button = true
 toc = true
 quick_navigation_buttons = true
@@ -33,14 +35,15 @@ show_date = true
 show_remote_changes = false
 show_remote_source = false
 # links.css: site icons before external links (GitHub, NVIDIA docs, linuxcontainers.org);
-# layout.css: a wider page, line spacing, left-aligned tables, distinct h2/h3; colors.css: dimmed accent;
+# layout.css: a wider page, line spacing, left-aligned tables, distinct h2/h3;
+# space.css: the look of emelianov.cloud (deep-space background, thin sans, violet accent);
 # code.css: console blocks with commands at full strength and output dimmed.
-stylesheets = ["css/links.css", "css/layout.css", "css/colors.css", "css/code.css"]
+stylesheets = ["css/links.css", "css/layout.css", "css/space.css", "css/code.css"]
 # Default LinkedIn preview; posts set their own card in front matter.
 social_media_card = "ai-lab/01-intro/card.png"
 favicon_emoji = "🎛️"
 # No header links (tabi's default menu lists demo sections). templates/partials/nav.html
-# still draws search and the theme switcher with an empty menu.
+# still draws search with an empty menu.
 menu = []
 
 socials = [

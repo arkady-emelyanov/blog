@@ -1,0 +1,257 @@
+/* The look of emelianov.cloud and its projects page: one light ink at a few
+   strengths, thin system sans, wide-tracked uppercase labels and a violet
+   accent, over deep space (a near-black indigo, a faint glow from above and a
+   repeating field of fine stars). Dark only: config.toml sets default_theme. */
+
+:root,
+[data-theme='dark'] {
+  --ink: 236, 240, 255;
+  --fg: rgba(var(--ink), 0.88);
+  --dim: rgba(var(--ink), 0.56);
+  --faint: rgba(var(--ink), 0.32);
+  --rule: rgba(var(--ink), 0.10);
+  --air: #a99cff;
+
+  /* tabi's variables, mapped onto the palette above */
+  --background-color: #04030c;
+  --bg-0: rgba(var(--ink), 0.05);
+  --bg-1: rgba(var(--ink), 0.07);
+  --bg-2: #08071a;
+  --bg-3: rgba(var(--ink), 0.16);
+  --hover-color: var(--dim);
+  --primary-color: var(--air);
+  --divider-color: var(--rule);
+  --text-color: var(--fg);
+  --text-color-high-contrast: rgba(var(--ink), 0.94);
+  --meta-color: var(--faint);
+  --codeblock-bg: rgba(8, 7, 26, 0.82);
+  --codeblock-highlight: rgba(169, 156, 255, 0.12);
+
+  /* Side notes: translucent panels over the sky, edged in the accent */
+  --admonition-note-border: rgba(169, 156, 255, 0.55);
+  --admonition-note-bg: rgba(169, 156, 255, 0.06);
+  --admonition-note-code: rgba(var(--ink), 0.08);
+  --admonition-tip-border: rgba(120, 220, 170, 0.6);
+  --admonition-tip-bg: rgba(120, 220, 170, 0.05);
+  --admonition-tip-code: rgba(var(--ink), 0.08);
+
+  --sans-serif-font: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", Roboto, sans-serif;
+  --code-font: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  scrollbar-color: rgba(var(--ink), 0.18) transparent;
+  color-scheme: dark;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-weight: 300;
+}
+
+::selection {
+  background: rgba(169, 156, 255, 0.3);
+}
+
+/* Fixed, so the text drifts across the sky rather than the sky scrolling away. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    url("../images/stars.webp") 0 0 / 1024px 1024px repeat,
+    radial-gradient(ellipse 70% 45% at 62% -8%, rgba(112, 72, 232, 0.14), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 0% 100%, rgba(40, 70, 160, 0.10), transparent 70%),
+    var(--background-color);
+}
+
+/* The site title as a wide-tracked uppercase label, set off by a violet rule
+   like the name on the front page. */
+header .navbar {
+  padding-block: 5vh 3vh;
+}
+
+header .home-title {
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid rgba(169, 156, 255, 0.35);
+  color: var(--fg);
+  font-size: 15px;
+  font-weight: 300;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+header .home-title:hover {
+  color: var(--air);
+}
+
+/* Titles in light weights; section labels tracked and uppercase. */
+.article-title,
+.section-title,
+.page-header {
+  font-weight: 300;
+  letter-spacing: 0.01em;
+}
+
+article :is(h2, h3, h4) {
+  color: var(--text-color-high-contrast);
+  font-weight: 400;
+}
+
+strong,
+article strong {
+  color: var(--text-color-high-contrast);
+  font-weight: 500;
+}
+
+/* The labels above the series navigation and the table of contents, like
+   the group names on the projects page. */
+.series-page-intro h3,
+article h3:has(+ .toc-container) {
+  color: var(--dim);
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.meta,
+.date,
+.reading-time {
+  color: var(--faint);
+}
+
+/* Links read as text with a violet underline; hovered, they turn violet
+   (tabi fills a block in the accent colour behind them). */
+a {
+  text-decoration: underline;
+  text-decoration-color: rgba(169, 156, 255, 0.35);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  color: var(--fg);
+  transition: color 0.3s ease, text-decoration-color 0.3s ease;
+}
+
+a:hover {
+  background-color: transparent;
+  color: var(--air);
+  text-decoration-color: var(--air);
+}
+
+a:not(.no-hover-padding):hover::before {
+  content: none;
+}
+
+/* Navigation and listing links carry no underline. */
+header a,
+footer a,
+.toc-container a,
+.series-page-intro a,
+.posts a,
+.bloglist-title a,
+.quick-navigation-buttons a {
+  text-decoration: none;
+}
+
+/* Code: a translucent panel over the sky, the language as a quiet label. */
+code {
+  background-color: rgba(var(--ink), 0.07);
+}
+
+pre {
+  border: 1px solid var(--rule);
+}
+
+pre code::before {
+  background-color: rgba(169, 156, 255, 0.07);
+  color: var(--faint);
+  font-family: var(--code-font);
+  letter-spacing: 0.24em;
+}
+
+/* Keycaps, as on a white Magic Keyboard (the projects page draws them the same way). */
+kbd {
+  display: inline-block;
+  min-width: 1.75em;
+  padding: 0 0.45em;
+  border: none;
+  border-radius: 5px;
+  background: linear-gradient(#ffffff, #ececef);
+  box-shadow: 0 1px 0 #b9b9c0, 0 2px 3px rgba(0, 0, 0, 0.45), inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+  color: #1d1d1f;
+  font: 500 11.5px/1.75 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  text-align: center;
+  vertical-align: 1px;
+}
+
+/* Images sit on the dark sky as they are, without tabi's dimming. */
+img {
+  filter: none;
+}
+
+/* The way back to the front page (templates/tabi/extend_body.html): the lower
+   half of a dark world hanging from the top edge, its rim lit from below.
+   Hovered, it sinks a little further into view, the rim brightens, and the
+   front page's name appears beneath it. */
+.home-world {
+  position: absolute;
+  top: -104px;
+  left: 62%;
+  z-index: 1;
+  width: 148px;
+  height: 148px;
+  margin-left: -74px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 18%, #07061a 58%, #141036 80%, #2a2168 100%);
+  box-shadow:
+    inset 0 -1px 2px rgba(214, 206, 255, 0.35),
+    0 1px 6px rgba(169, 156, 255, 0.16),
+    0 6px 30px rgba(112, 72, 232, 0.14);
+  text-decoration: none;
+  transition: transform 0.5s ease, box-shadow 0.5s ease;
+}
+
+.home-world span {
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: var(--faint);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.home-world:hover,
+.home-world:focus-visible {
+  outline: none;
+  transform: translateY(6px);
+  box-shadow:
+    inset 0 -2px 4px rgba(226, 220, 255, 0.85),
+    0 2px 14px rgba(169, 156, 255, 0.50),
+    0 12px 70px rgba(112, 72, 232, 0.45);
+}
+
+.home-world:hover span,
+.home-world:focus-visible span {
+  opacity: 1;
+}
+
+@media (max-width: 720px) {
+  .home-world {
+    top: -64px;
+    width: 92px;
+    height: 92px;
+    margin-left: -46px;
+  }
+
+  header .navbar {
+    padding-top: 56px;
+  }
+}
