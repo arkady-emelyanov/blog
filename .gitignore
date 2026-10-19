@@ -4,3 +4,6 @@
 public/
 .claude/skills/
 PLAN.md
+# Raw screen recordings for posts, until the edited cut is ready.
+content/**/video/*
+!content/contained/video/caught.mp4
