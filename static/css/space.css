@@ -108,9 +108,12 @@ article strong {
 }
 
 /* The labels above the series navigation and the table of contents, like
-   the group names on the projects page. */
+   the group names on the projects page. The series posts write that heading
+   themselves, just before the list; elsewhere tabi draws its own inside the
+   container, so both arrangements are matched. */
 .series-page-intro h3,
-article h3:has(+ .toc-container) {
+article h3:has(+ .toc-container),
+.toc-container > h3 {
   color: var(--dim);
   font-size: 13px;
   font-weight: 300;
@@ -254,4 +257,10 @@ img {
   header .navbar {
     padding-top: 56px;
   }
+}
+
+/* A video keeps its shape as the column narrows: tabi caps the width but
+   leaves the height attribute in place, which would otherwise squash it. */
+video {
+  height: auto;
 }
