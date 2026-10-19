@@ -35,7 +35,7 @@ show_date = true
 show_remote_changes = false
 show_remote_source = false
 # links.css: site icons before external links (GitHub, NVIDIA docs, linuxcontainers.org);
-# layout.css: a wider page, line spacing, left-aligned tables, distinct h2/h3;
+# layout.css: a wider page, line spacing, left-aligned tables, distinct h2/h3, figures that open full size;
 # space.css: the look of emelianov.cloud (deep-space background, thin sans, violet accent);
 # code.css: console blocks with commands at full strength and output dimmed.
 stylesheets = ["css/links.css", "css/layout.css", "css/space.css", "css/code.css"]
