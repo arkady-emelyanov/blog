@@ -64,6 +64,12 @@ CARDS = [
     dict(file="08-gpu-handover", part=8,
          chips=["nvidia-smi --gpu-reset", "Slurm epilog", "GPU_RESET"],
          focus={GPUS}, label="reset between tenants"),
+    dict(file="09-inference", part=9,
+         chips=["SGLang · vLLM", "tensor parallelism", "OpenAI API"],
+         focus={GPUS, LINKS, IB}, label="TP=8 across both trays"),
+    dict(file="10-runai", part=10,
+         chips=["Run:ai · KAI", "GPU fractions", "DCGM · NRI · CDI"],
+         focus={GPUS}, label="two half-GPU workloads, one GPU"),
 ]
 PARTS = max(c["part"] for c in CARDS)
 
