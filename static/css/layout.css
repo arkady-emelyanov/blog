@@ -159,3 +159,27 @@ article p > .t:first-child {
   color: var(--air, #a99cff);
   background: rgba(169, 156, 255, 0.1);
 }
+
+/* A coloured square before each section heading, so headings stand out
+   when scrolling: violet and larger for h2, mint and smaller for h3. The
+   uppercase labels (table of contents, series navigation) get none. */
+article h2::before,
+article h3:not(.series-page-intro h3, :has(+ .toc-container))::before {
+  content: "";
+  display: inline-block;
+  vertical-align: middle;
+  margin-inline-end: 0.55em;
+  border-radius: 2px;
+  position: relative;
+  top: -0.08em;
+}
+article h2::before {
+  width: 0.5em;
+  height: 0.5em;
+  background: var(--air, #a99cff);
+}
+article h3:not(.series-page-intro h3, :has(+ .toc-container))::before {
+  width: 0.42em;
+  height: 0.42em;
+  background: rgb(120, 220, 170);
+}
