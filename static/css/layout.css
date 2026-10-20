@@ -133,3 +133,29 @@ dialog.lightbox img {
 .lightbox-close:focus-visible {
     opacity: 1;
 }
+
+/* Lists in admonitions line up with the paragraphs, which tabi pulls left
+   under the icon, and keep the paragraphs' spacing. */
+.admonition-content > ul,
+.admonition-content > ol {
+  margin-inline-start: -1.75rem;
+  margin-block-end: 0;
+  padding-inline-start: 1.5rem;
+}
+
+/* Run timelines: a paragraph that starts with a time mark
+   (<span class="t">T+5 min</span>) reads as a log entry, with space above
+   and the mark as a small monospace tag. */
+article p:has(> .t:first-child) {
+  margin-block-start: 2.2rem;
+}
+article p > .t:first-child {
+  display: inline-block;
+  margin-inline-end: 0.5rem;
+  padding: 0 0.45rem;
+  border-radius: 4px;
+  font-family: var(--code-font, ui-monospace, monospace);
+  font-size: 0.85em;
+  color: var(--air, #a99cff);
+  background: rgba(169, 156, 255, 0.1);
+}
