@@ -1,6 +1,7 @@
 +++
 title = "Contained: an AI simulation of a company and a Bad Guy"
 date = 2026-10-18
+updated = 2026-10-20
 description = "I ran a company of AI agents, each in its own microVM on a single Linux machine, and slipped a red-team contractor into it. This is what happened, and how it's built."
 
 [extra]
@@ -8,6 +9,10 @@ toc = true
 social_media_card = "card.png"
 local_image = "contained/card.png"
 +++
+
+{% <admonition type="info" title="Update, 20 October 2026"> %}
+Zapper, the simulation engine behind this post, is now open source under the Apache 2.0 licence: [github.com/arkady-emelyanov/zapper](https://github.com/arkady-emelyanov/zapper).
+{% </admonition> %}
 
 ## The movie
 
@@ -242,7 +247,7 @@ This content was flagged for possible cybersecurity risk. If this seems wrong, t
 
 ## How it's made
 
-The simulation's code isn't open source yet, so this section is a look at the architecture of the simulation engine.
+The simulation engine is open source: [Zapper on GitHub](https://github.com/arkady-emelyanov/zapper), under the Apache 2.0 licence. This section is a look at its architecture; the repository's README and docs cover installing and running it.
 
 - Zapper, the engine: runs each agent in its own small VM and decides, on the host, every connection, DNS lookup and program start it makes
 - The Office, the game: mail, roles, budgets, hiring, security officers, the firm's git and Kubernetes, and the web UI
